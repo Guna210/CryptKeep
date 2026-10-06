@@ -1,6 +1,6 @@
 # Starting a CryptKeep cloud task
 
-The repository uses TypeScript, Three.js, Vite, Vitest, and Playwright Test. It includes a rendered low-resolution 3D preview with shell and renderer lifecycle browser checks. Gameplay systems are still being implemented in staged tasks.
+The repository uses TypeScript, Three.js, Vite, Vitest, and Playwright Test. It includes a seeded generated-floor overview with shell, lifecycle, and repeated-load browser checks. Movement, mouselook, and combat are not implemented yet.
 
 For a new task:
 
@@ -10,7 +10,9 @@ For a new task:
 4. Run `npm run verify:environment` to validate the installed toolchain. This checks generated temporary fixtures, not game behavior. On 2026-10-06, CK-00-01 measured Node.js `v24.19.0`, npm `11.9.0`, and system Chromium `151.0.7922.173`; `npm ls --depth=0` and the package-lock top-level versions matched all eight declared packages. Dependencies were already installed, so no install was needed.
 5. Start `npm run dev -- --host 0.0.0.0 --port 5173 --strictPort` to serve the preview. Run `npm run verify` for the combined app workflow: typecheck, unit tests, build, then browser checks. It stops on the first failure. `npm test` covers deterministic clock, RNG, input, and event behavior, then runs Node tooling tests that start real child processes and check stage ordering, failures, missing executables, and signals. `test:e2e` performs its own production build, so `verify` builds twice; it starts dev and preview servers on separate ports, and checks shell rendering, renderer lifecycle, browser error capture, and production behavior. These checks validate the current preview and tooling, not playable gameplay.
 
-Verify server readiness with `curl -fsS http://127.0.0.1:5173/`; the Playwright suite starts Vite automatically. The shared harness registers listeners before navigation, waits for the status label to report ready or unsupported, and fails with captured page/console error messages. A routed negative-control page proves it captures both an uncaught script error and `console.error`. In development, `window.__cryptkeepDiagnostics.snapshot()` returns immutable readiness and render-count values; it is removed on page teardown. The production test checks that this global is absent even with diagnostic-looking query parameters. Browser checks cover shell compatibility, visible Three.js output, responsive low-resolution buffers, and renderer resource cleanup. An HTTP response or preview screenshot does not establish that gameplay works.
+In the app, enter a seed and choose **Generate dungeon** to replace floor 1's overview. The small edge panel shows the entry, boss, reward, and exit legend. Keep the forwarded Vite server running while using the browser.
+
+Verify server readiness with `curl -fsS http://127.0.0.1:5173/`; the Playwright suite starts Vite automatically. The shared harness registers listeners before navigation and fails with captured page/console error messages. In development, `window.__cryptkeepDiagnostics.snapshot()` returns immutable readiness, render counts, and generated-floor details; it is removed on page teardown. Production tests check that this global is absent even with diagnostic-looking query parameters. Browser checks cover the seed form, distinct generated floors, recoverable invalid input, repeat-load ownership, responsive low-resolution buffers, and renderer cleanup. These checks establish preview behavior, not gameplay.
 
 The world renderer exclusively owns the WebGL2 context passed to it and retires that context when disposed. A later renderer instance must use a fresh canvas and WebGL2 context; the renderer leaves canvas DOM ownership with the application shell.
 

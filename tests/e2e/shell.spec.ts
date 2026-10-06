@@ -6,7 +6,7 @@ test("application shell renders, resizes, and reports ready diagnostics", async 
   await page.goto("/");
   expect(await browserHarness.waitForReadiness()).toBe("ready");
   await expect(page.getByRole("heading", { name: "CRYPTKEEP" })).toBeVisible();
-  await expect(page.getByText("A glimpse of the depths below.")).toBeVisible();
+  await expect(page.getByText("Floor 1 · Seed cryptkeep-preview")).toBeVisible();
   const diagnostics = await page.evaluate(() => {
     const snapshot = window.__cryptkeepDiagnostics?.snapshot() ?? null;
     return {
@@ -16,7 +16,9 @@ test("application shell renders, resizes, and reports ready diagnostics", async 
     };
   });
   expect(diagnostics.snapshot?.readiness).toBe("ready");
-  expect(diagnostics.snapshot?.renderer?.drawCalls).toBeGreaterThan(0);
+  expect(diagnostics.snapshot?.floor?.currentFloors).toBe(1);
+  expect(diagnostics.snapshot?.floor?.contentHash).toMatch(/^fnv1a:/);
+  await expect.poll(() => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().renderer?.drawCalls ?? 0)).toBeGreaterThan(0);
   expect(diagnostics.frozen).toBe(true);
   expect(diagnostics.rendererFrozen).toBe(true);
 
@@ -39,8 +41,9 @@ test("application shell renders, resizes, and reports ready diagnostics", async 
     return [rect.width, rect.height, canvas.width, canvas.height];
   })).toEqual([720, 480, 405, 270]);
 
-  await page.evaluate(() => window.dispatchEvent(new Event("pagehide")));
+  await page.evaluate(() => { window.dispatchEvent(new Event("pagehide")); window.dispatchEvent(new Event("pagehide")); });
   expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
+  expect(await page.evaluate(() => document.querySelector("#app")?.childElementCount)).toBe(0);
   browserHarness.assertNoErrors();
 });
 
@@ -60,5 +63,8 @@ test("unsupported WebGL 2 has honest readiness and a readable compatibility mess
   await expect(page.getByText(/needs WebGL 2 to render/i)).toBeVisible();
   await expect(page.getByRole("main", { name: "CryptKeep status" })).toHaveClass(/unsupported/);
   await page.screenshot({ path: "test-results/CK-00-03/unsupported-webgl2.png", fullPage: true });
+  await page.evaluate(() => { window.dispatchEvent(new Event("pagehide")); window.dispatchEvent(new Event("pagehide")); });
+  expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
+  expect(await page.evaluate(() => document.querySelector("#app")?.childElementCount)).toBe(0);
   browserHarness.assertNoErrors();
 });

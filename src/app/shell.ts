@@ -3,6 +3,11 @@ import "../ui/shell.css";
 export interface AppShell {
   readonly canvas: HTMLCanvasElement;
   readonly overlay: HTMLElement;
+  readonly seedInput: HTMLInputElement;
+  readonly generateButton: HTMLButtonElement;
+  readonly statusLabel: HTMLElement;
+  readonly statusMessage: HTMLElement;
+  readonly legend: HTMLElement;
   readonly context: WebGL2RenderingContext | null;
   dispose(): void;
 }
@@ -26,6 +31,8 @@ export function createAppShell(root: HTMLElement, options: ShellOptions = {}): A
   brand.innerHTML = '<span class="cryptkeep__rune" aria-hidden="true">✦</span><h1>CRYPTKEEP</h1>';
 
   const status = document.createElement("p");
+  status.setAttribute("role", "status");
+  status.setAttribute("aria-live", "polite");
   status.className = "cryptkeep__status";
 
   const statusLabel = document.createElement("span");
@@ -37,7 +44,28 @@ export function createAppShell(root: HTMLElement, options: ShellOptions = {}): A
   statusMessage.textContent = "Preparing the dungeon…";
   status.append(statusLabel, statusMessage);
   brand.append(status);
-  overlay.append(brand);
+  const controls = document.createElement("form");
+  controls.className = "cryptkeep__controls";
+  const label = document.createElement("label");
+  label.htmlFor = "cryptkeep-seed";
+  label.textContent = "Dungeon seed";
+  const seedInput = document.createElement("input");
+  seedInput.id = "cryptkeep-seed";
+  seedInput.name = "seed";
+  seedInput.maxLength = 128;
+  seedInput.autocomplete = "off";
+  seedInput.value = "cryptkeep-preview";
+  const generateButton = document.createElement("button");
+  generateButton.type = "submit";
+  generateButton.textContent = "Generate dungeon";
+  controls.append(label, seedInput, generateButton);
+  const legend = document.createElement("p");
+  legend.className = "cryptkeep__legend";
+  legend.innerHTML = '<span class="entry">Entry</span><span class="boss">Boss</span><span class="reward">Reward</span><span class="exit">Exit</span>';
+  const panel = document.createElement("section");
+  panel.className = "cryptkeep__panel";
+  panel.append(brand, controls, legend);
+  overlay.append(panel);
   root.replaceChildren(canvas, overlay);
 
   const getContext = options.getWebGL2Context ?? ((element) => element.getContext("webgl2"));
@@ -51,6 +79,11 @@ export function createAppShell(root: HTMLElement, options: ShellOptions = {}): A
   return {
     canvas,
     overlay,
+    seedInput,
+    generateButton,
+    statusLabel,
+    statusMessage,
+    legend,
     context,
     dispose() {
       root.replaceChildren();

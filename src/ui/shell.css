@@ -30,16 +30,18 @@ html, body, #app {
 .cryptkeep__overlay {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 2rem;
-  background: radial-gradient(ellipse at 50% 45%, rgb(29 34 43 / 18%), transparent 58%);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 1rem;
   pointer-events: none;
 }
 
+.cryptkeep__panel { width: min(19rem, calc(100vw - 2rem)); padding: 1rem; background: rgb(9 11 16 / 86%); border: 1px solid #554536; box-shadow: 0 5px 24px #0008; pointer-events: auto; }
+
 .cryptkeep__brand {
-  width: min(100%, 35rem);
-  text-align: center;
+  width: 100%;
+  text-align: left;
   text-shadow: 0 2px 0 #08090c, 0 0 24px rgb(139 69 47 / 26%);
 }
 
@@ -53,7 +55,7 @@ html, body, #app {
 .cryptkeep__brand h1 {
   margin: 0;
   color: #e1d6b9;
-  font-size: clamp(2rem, 7vw, 4.3rem);
+  font-size: 1.35rem;
   font-weight: 700;
   letter-spacing: 0.24em;
   text-indent: 0.24em;
@@ -62,7 +64,7 @@ html, body, #app {
 .cryptkeep__status {
   display: grid;
   gap: 0.8rem;
-  margin: 2.2rem auto 0;
+  margin: 0.8rem 0 0;
   color: #b9b4a6;
   line-height: 1.6;
 }
@@ -75,6 +77,17 @@ html, body, #app {
 }
 
 .cryptkeep__status-message { font-size: 0.92rem; }
+
+.cryptkeep__controls { display: grid; gap: 0.45rem; margin-top: 1rem; }
+.cryptkeep__controls label, .cryptkeep__legend { font-size: 0.72rem; }
+.cryptkeep__controls input, .cryptkeep__controls button { min-height: 2.4rem; padding: 0.45rem 0.55rem; color: #eee3ca; background: #171a20; border: 1px solid #78634b; font: inherit; }
+.cryptkeep__controls button { cursor: pointer; background: #493525; }
+.cryptkeep__controls button:disabled { opacity: 0.65; cursor: wait; }
+.cryptkeep__legend { display: flex; flex-wrap: wrap; gap: 0.4rem 0.7rem; margin: 0.85rem 0 0; }
+.cryptkeep__legend .entry { color: #48dce5; }
+.cryptkeep__legend .boss { color: #ff5149; }
+.cryptkeep__legend .reward { color: #68e078; }
+.cryptkeep__legend .exit { color: #f5c44d; }
 
 .cryptkeep__overlay--unsupported {
   background: rgb(8 10 14 / 90%);

@@ -5,7 +5,7 @@ test("production app renders without development diagnostics, including with a t
   await expect(page.getByRole("heading", { name: "CRYPTKEEP" })).toBeVisible();
   await expect(page.getByText("DUNGEON PREVIEW")).toBeVisible();
   await expect(page.locator("canvas")).toBeVisible();
-  await expect(page.getByText("A glimpse of the depths below.")).toBeVisible();
+  await expect(page.getByText("Floor 1 · Seed cryptkeep-preview")).toBeVisible();
   await expect.poll(() => page.locator("canvas").evaluate((canvas: HTMLCanvasElement) => canvas.width)).toBeGreaterThan(0);
   expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
   browserHarness.assertNoErrors();
