@@ -36,6 +36,8 @@ export interface WorldRendererOptions {
   /** Resize observation is scoped to the shell, not a process-wide window listener. */
   resizeTarget: HTMLElement;
   fov?: number;
+  /** Keep the original diagnostic preview unless a floor-only scene is requested. */
+  includeDiagnosticFixture?: boolean;
 }
 
 const LOGICAL_WIDTH = 480;
@@ -89,7 +91,7 @@ export function createWorldRenderer(canvas: HTMLCanvasElement, options: WorldRen
   const fill = new DirectionalLight(0x7e91b8, 0.8);
   fill.position.set(-3, 4, 5);
   scene.add(fill);
-  const fixture = createDiagnosticFixture(scene);
+  const fixture = options.includeDiagnosticFixture === false ? null : createDiagnosticFixture(scene);
 
   let disposed = false;
   const resize = () => {
@@ -125,9 +127,11 @@ export function createWorldRenderer(canvas: HTMLCanvasElement, options: WorldRen
       if (disposed) return;
       disposed = true;
       observer.disconnect();
-      scene.remove(fixture.root);
-      for (const geometry of fixture.geometries) geometry.dispose();
-      for (const material of fixture.materials) material.dispose();
+      if (fixture) {
+        scene.remove(fixture.root);
+        for (const geometry of fixture.geometries) geometry.dispose();
+        for (const material of fixture.materials) material.dispose();
+      }
       scene.clear();
       renderer.dispose();
       // Three.js keeps some internal GPU textures outside renderer-local ownership.
