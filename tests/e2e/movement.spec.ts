@@ -63,7 +63,7 @@ test("real player input moves, mouse changes the camera, and release stops motio
   await page.waitForTimeout(250);
   expect((await player()).pose).toEqual(stoppedAt);
   await page.keyboard.down("w");
-  await page.waitForTimeout(350);
+  await page.waitForTimeout(450);
   await page.keyboard.up("w");
   expect(Math.hypot((await player()).pose!.x-stoppedAt!.x,(await player()).pose!.z-stoppedAt!.z)).toBeGreaterThan(0.2);
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));
@@ -79,6 +79,42 @@ test("real player input moves, mouse changes the camera, and release stops motio
   await page.waitForTimeout(150);
   await page.keyboard.up("w");
   expect((await player()).pose).toEqual(pausedAt);
+  browserHarness.assertNoErrors();
+});
+
+test("Left Shift is wired to valid sprint, stationary Shift is free, and pause freezes meter snapshots", async ({ page, browserHarness }) => {
+  await page.goto("/");
+  await expect(page.getByText("DUNGEON PREVIEW")).toBeVisible();
+  const read = () => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!);
+  await page.getByRole("button", {name:"Explore dungeon"}).click();
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
+  let snapshot = await read();
+  const full = snapshot.resources!.stamina.current;
+  const stationaryTick = (await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().floor!.tick)) + 2;
+  await page.keyboard.down("Shift");
+  await expect.poll(() => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().floor!.tick), {timeout:5000}).toBeGreaterThanOrEqual(stationaryTick);
+  expect((await read()).resources!.stamina.current).toBe(full);
+  await page.keyboard.up("Shift");
+
+  const movingTick = (await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().floor!.tick)) + 24;
+  await page.keyboard.down("w");
+  await page.keyboard.down("Shift");
+  await expect.poll(async () => {
+    const p = await read();
+    return p.sprinting && Math.hypot(p.velocity!.x,p.velocity!.z) > 3.5 && p.resources!.stamina.current < full;
+  }, {timeout:8000}).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().floor!.tick), {timeout:5000}).toBeGreaterThanOrEqual(movingTick);
+  snapshot = await read();
+  expect(snapshot.resources!.stamina.current).toBeLessThan(full);
+  expect(snapshot.sprinting).toBe(true);
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("w");
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await read()).active).toBe(false);
+  const paused = await read();
+  await page.waitForTimeout(800);
+  expect((await read()).resources).toEqual(paused.resources);
+  expect((await read()).regenTimers).toEqual(paused.regenTimers);
   browserHarness.assertNoErrors();
 });
 
@@ -111,11 +147,13 @@ test("swept movement stops at a generated wall with the full player circle clear
   await expect.poll(()=>page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().player!.pose!.yaw)).toBeCloseTo(target.yaw,2);
   const spawn=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().player!.pose!);
   await page.keyboard.down("w");
+  await page.keyboard.down("Shift");
   await expect.poll(async()=>page.evaluate(({x,z,dx,dz})=>{
     const p=window.__cryptkeepDiagnostics!.snapshot().player!.pose!;
     return (p.x-x)*dx+(p.z-z)*dz;
   },{x:spawn.x,z:spawn.z,dx:target.direction.x,dz:target.direction.z}),{timeout:15000}).toBeGreaterThan(target.distance-0.06);
   await page.keyboard.up("w");
+  await page.keyboard.up("Shift");
   const finalPlayer=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().player!);
   const stopped=finalPlayer.pose!;
   expect(isPoseValid(floor,stopped)).toBe(true);
@@ -123,6 +161,17 @@ test("swept movement stops at a generated wall with the full player circle clear
   expect(progress).toBeGreaterThan(target.distance-0.06);
   expect(progress).toBeLessThanOrEqual(target.distance+0.02);
   expect(finalPlayer.velocity!.x*target.direction.x+finalPlayer.velocity!.z*target.direction.z).toBe(0);
+  expect(finalPlayer.resources!.stamina.current).toBeLessThan(100);
+  const staminaAtWall = finalPlayer.resources!.stamina.current;
+  await page.keyboard.down("w");
+  await page.keyboard.down("Shift");
+  await expect.poll(async () => (await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!)).lastSample?.held.includes("sprint")).toBe(true);
+  await expect.poll(async () => (await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!)).resources!.stamina.current, {timeout:5000}).toBe(100);
+  const heldAtWall = await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!);
+  await page.waitForTimeout(150);
+  expect((await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!)).resources!.stamina.current).toBe(heldAtWall.resources!.stamina.current);
+  await page.keyboard.up("Shift");
+  await page.keyboard.up("w");
   await page.keyboard.press("Escape");
   browserHarness.assertNoErrors();
 });

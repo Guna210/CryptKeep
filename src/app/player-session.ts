@@ -4,6 +4,8 @@ import { applyMouseLook } from "../player/look";
 import { stepLocomotion } from "../player/movement";
 import { moveCircleOnGrid } from "../player/collision";
 import { createPlayerState, type PlayerState } from "../player/state";
+import { advanceResourceRegeneration, createResourceRegenTimers, type ResourceRegenTimers } from "../player/resources";
+import { commitSprintMovement, decideSprint, hasSprintMovement } from "../player/sprint";
 import type { WorldRenderer } from "../render/renderer";
 import type { RoleFloorPlan } from "../dungeon/roles";
 import type { FloorSession } from "./floor-session";
@@ -22,6 +24,9 @@ export interface PlayerSessionSnapshot {
   readonly active: boolean;
   readonly capture: PointerCaptureState;
   readonly lastSample: ReturnType<InputSampler["sample"]> | null;
+  readonly resources: Readonly<{ health: PlayerState["health"]; stamina: PlayerState["stamina"]; mana: PlayerState["mana"] }> | null;
+  readonly regenTimers: ResourceRegenTimers;
+  readonly sprinting: boolean;
 }
 
 /** App-lifetime owner for native input, player simulation and camera presentation. */
@@ -34,10 +39,13 @@ export class PlayerSession {
   private active = false;
   private disposed = false;
   private lastSample: ReturnType<InputSampler["sample"]> | null = null;
+  private regenTimers = createResourceRegenTimers();
+  private sprinting = false;
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const target = event.target;
     if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
     if (this.capture.state !== "captured" || !this.active) return;
+    if (event.code === "ShiftLeft") { event.preventDefault(); if (!event.repeat) this.input.press("sprint"); return; }
     const action = KEY_ACTIONS[event.key];
     if (!action) return;
     event.preventDefault();
@@ -53,6 +61,7 @@ export class PlayerSession {
   };
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     if (this.capture.state !== "captured") return;
+    if (event.code === "ShiftLeft") { event.preventDefault(); this.input.release("sprint"); return; }
     const action = KEY_ACTIONS[event.key];
     if (action) { event.preventDefault(); this.input.release(action); }
   };
@@ -94,6 +103,8 @@ export class PlayerSession {
     this.plan = generated.plan;
     const created = createPlayerState(generated.plan);
     this.state = created.state;
+    this.regenTimers = createResourceRegenTimers();
+    this.sprinting = false;
     this.previous = created.state.pose;
     this.applyCamera(1);
     return generated;
@@ -126,10 +137,28 @@ export class PlayerSession {
       if (command.look.x !== 0 || command.look.y !== 0) pose = { ...pose, ...applyMouseLook(pose, command.look) };
       this.state = Object.freeze({ ...this.state, pose:Object.freeze(pose) });
       this.previous = this.state.pose;
-      const step = stepLocomotion(this.state, command.movement, FIXED_STEP_SECONDS);
-      const moved = moveCircleOnGrid(this.plan!, this.state.pose, step.displacement, this.state.radius);
-      const velocity = Object.freeze({ x:moved.blockedX ? 0 : step.state.velocity.x, y:0, z:moved.blockedZ ? 0 : step.state.velocity.z });
-      this.state = Object.freeze({ ...step.state, pose:Object.freeze({ ...step.state.pose, x:moved.position.x, z:moved.position.z }), velocity });
+      const sprint = decideSprint(this.state.stamina, FIXED_STEP_SECONDS, {
+        held:command.held.includes("sprint"), active:this.active, axes:command.movement,
+        secondaryHeld:command.held.includes("secondary"), healing:false, stanceRestricted:false,
+      });
+      let base = this.state;
+      if (!sprint.eligible) base = capPlanarVelocity(base, 3.5);
+      let locomotion = stepLocomotion(base, command.movement, FIXED_STEP_SECONDS, { maxSpeed:sprint.maximumSpeed });
+      let moved = moveCircleOnGrid(this.plan!, base.pose, locomotion.displacement, base.radius);
+      let sprintMovementCandidate = sprint.eligible;
+      if (sprint.eligible && !hasSprintMovement(moved.appliedDisplacement)) {
+        sprintMovementCandidate = false;
+        base = capPlanarVelocity(base, 3.5);
+        locomotion = stepLocomotion(base, command.movement, FIXED_STEP_SECONDS);
+        moved = moveCircleOnGrid(this.plan!, base.pose, locomotion.displacement, base.radius);
+      }
+      const velocity = Object.freeze({ x:moved.blockedX ? 0 : locomotion.state.velocity.x, y:0, z:moved.blockedZ ? 0 : locomotion.state.velocity.z });
+      const committed = commitSprintMovement(locomotion.state, sprintMovementCandidate ? sprint : { eligible:false, maximumSpeed:3.5, staminaCost:0 }, moved.appliedDisplacement);
+      this.sprinting = committed.spent;
+      const regenerated = advanceResourceRegeneration(committed.state, this.regenTimers, FIXED_STEP_SECONDS, { staminaSpent:committed.spent, active:this.active });
+      this.regenTimers = regenerated.timers;
+      this.state = Object.freeze({ ...committed.state, health:regenerated.health, stamina:regenerated.stamina, mana:regenerated.mana,
+        pose:Object.freeze({ ...locomotion.state.pose, x:moved.position.x, z:moved.position.z }), velocity });
     }
     this.applyCamera(result.alpha);
     return result;
@@ -138,7 +167,9 @@ export class PlayerSession {
   snapshot(): Readonly<PlayerSessionSnapshot> {
     return Object.freeze({ pose:this.state ? Object.freeze({...this.state.pose}) : null, velocity:this.state ? Object.freeze({...this.state.velocity}) : null,
       radius:this.state?.radius ?? 0.28, cameraHeight:this.state?.cameraHeight ?? 1.6, active:this.active, capture:this.capture.state,
-      lastSample:this.lastSample ? Object.freeze({...this.lastSample}) : null });
+      lastSample:this.lastSample ? Object.freeze({...this.lastSample}) : null,
+      resources:this.state ? Object.freeze({ health:Object.freeze({...this.state.health}), stamina:Object.freeze({...this.state.stamina}), mana:Object.freeze({...this.state.mana}) }) : null,
+      regenTimers:Object.freeze({...this.regenTimers}), sprinting:this.sprinting });
   }
 
   dispose(): void {
@@ -160,7 +191,15 @@ export class PlayerSession {
 
   private stopMotion(): void {
     if (!this.state) return;
+    this.sprinting = false;
     this.state = Object.freeze({ ...this.state, velocity:Object.freeze({x:0,y:0,z:0}) });
     this.previous = this.state.pose;
   }
+}
+
+function capPlanarVelocity(player: PlayerState, maximum: number): PlayerState {
+  const speed = Math.hypot(player.velocity.x, player.velocity.z);
+  if (speed <= maximum || speed === 0) return player;
+  const ratio = maximum / speed;
+  return Object.freeze({ ...player, velocity:Object.freeze({ ...player.velocity, x:player.velocity.x * ratio, z:player.velocity.z * ratio }) });
 }
