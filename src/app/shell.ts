@@ -3,6 +3,7 @@ import "../ui/shell.css";
 export interface AppShell {
   readonly canvas: HTMLCanvasElement;
   readonly overlay: HTMLElement;
+  readonly context: WebGL2RenderingContext | null;
   dispose(): void;
 }
 
@@ -40,37 +41,18 @@ export function createAppShell(root: HTMLElement, options: ShellOptions = {}): A
   root.replaceChildren(canvas, overlay);
 
   const getContext = options.getWebGL2Context ?? ((element) => element.getContext("webgl2"));
-  const gl = getContext(canvas);
-  if (gl) {
-    gl.clearColor(0.035, 0.045, 0.065, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-  } else {
+  const context = getContext(canvas);
+  if (!context) {
     statusLabel.textContent = "RENDERING UNAVAILABLE";
     statusMessage.textContent = "CryptKeep needs WebGL 2 to render. Try a current desktop browser with hardware acceleration enabled.";
     overlay.classList.add("cryptkeep__overlay--unsupported");
   }
 
-  const resize = () => {
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    const width = Math.max(1, Math.floor(root.clientWidth * ratio));
-    const height = Math.max(1, Math.floor(root.clientHeight * ratio));
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-      if (gl) {
-        gl.viewport(0, 0, width, height);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-      }
-    }
-  };
-  window.addEventListener("resize", resize);
-  resize();
-
   return {
     canvas,
     overlay,
+    context,
     dispose() {
-      window.removeEventListener("resize", resize);
       root.replaceChildren();
     },
   };

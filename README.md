@@ -1,10 +1,10 @@
 # CryptKeep
 
-CryptKeep is a browser-based first-person dungeon crawler under development, built with TypeScript, Three.js, and Vite. The initial application shell is in place and reports its loading or WebGL 2 compatibility state; gameplay systems are being added in task-sized stages.
+CryptKeep is a browser-based first-person dungeon crawler under development, built with TypeScript, Three.js, and Vite. The app currently renders a low-resolution 3D dungeon preview and reports WebGL 2 compatibility; gameplay systems are being added in task-sized stages.
 
 ## Implementation plan
 
-[SPEC.md](SPEC.md) defines the complete 100-level game and 196 small implementation tasks across 20 milestones. Each task includes dependencies, file ownership, acceptance checks and evidence requirements. [CONTEXT.md](CONTEXT.md) records live progress and recovery information. See [progress/CK-00-02.md](progress/CK-00-02.md) for the current shell implementation and verification evidence.
+[SPEC.md](SPEC.md) defines the complete 100-level game and 196 small implementation tasks across 20 milestones. Each task includes dependencies, file ownership, acceptance checks and evidence requirements. [CONTEXT.md](CONTEXT.md) records live progress and recovery information. See [progress/CK-00-03.md](progress/CK-00-03.md) for the renderer implementation and verification evidence.
 
 Approved direction: single-player desktop browser, pixel-textured 3D rooms/creatures, five weapon classes, ten regions and floor-entry checkpoint retry. Target ordinary floors at 3–6 minutes and the full campaign at approximately 5–10 hours, to be tested and tuned. Git checkpoints use one baseline commit followed by one commit per accepted task; every accepted task is pushed, including trivial, documentation and tooling work.
 
@@ -22,7 +22,7 @@ To repeat only the setup validation, run `npm run verify:environment`. See [docs
 
 ## Application commands
 
-`npm run dev` serves the current shell and `npm run build` builds it. `npm run typecheck` checks the app and shared tooling; `npm test` runs unit tests and `npm run test:e2e` runs browser checks against Vite. The current page is only an initialization/compatibility shell, not playable gameplay. `verify:environment` runs generated fixtures only and must not be reported as gameplay validation. Playwright uses the system Chromium binary and the launch flags validated by the environment check; no browser download is required.
+`npm run dev` serves the current preview and `npm run build` builds it. `npm run typecheck` checks the app and shared tooling; `npm run test:e2e` runs browser checks against Vite, including actual WebGL rendering and renderer lifecycle. `npm test` currently exits because no Vitest test files exist. The preview is not playable gameplay. `verify:environment` runs generated fixtures only and must not be reported as gameplay validation. Playwright uses the system Chromium binary and the launch flags validated by the environment check; no browser download is required.
 
 ## Runtime and storage notes
 
