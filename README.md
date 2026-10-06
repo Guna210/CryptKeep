@@ -4,7 +4,7 @@ CryptKeep is a browser-based first-person dungeon crawler under development, bui
 
 ## Implementation plan
 
-[SPEC.md](SPEC.md) defines the complete 100-level game and 196 small implementation tasks across 20 milestones. Each task includes dependencies, file ownership, acceptance checks and evidence requirements. [CONTEXT.md](CONTEXT.md) records live progress and recovery information. See [progress/CK-00-03.md](progress/CK-00-03.md) for the renderer implementation and verification evidence.
+[SPEC.md](SPEC.md) defines the complete 100-level game and 196 small implementation tasks across 20 milestones. Each task includes dependencies, file ownership, acceptance checks and evidence requirements. [CONTEXT.md](CONTEXT.md) records live progress and recovery information. The first milestone M00 is complete: CK-00-01 through CK-00-10 are independently reviewed and published. See [progress/CK-00-10.md](progress/CK-00-10.md) for the successful hosted verification run and [CONTEXT.md](CONTEXT.md) for task progress.
 
 Approved direction: single-player desktop browser, pixel-textured 3D rooms/creatures, five weapon classes, ten regions and floor-entry checkpoint retry. Target ordinary floors at 3–6 minutes and the full campaign at approximately 5–10 hours, to be tested and tuned. Git checkpoints use one baseline commit followed by one commit per accepted task; every accepted task is pushed, including trivial, documentation and tooling work.
 
