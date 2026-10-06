@@ -14,7 +14,7 @@ On resuming, read the latest owner messages, inspect the working tree, then cons
 - **Builders: GPT-6 Luna subagents.** Use the explicit model identifier `gpt-6-luna` for implementation tasks when that phase is authorized. Do not silently substitute another model; report unavailable model access.
 - **Independent reviewers: separately spawned GPT-6 Luna subagents.** Every implementation is reviewed before acceptance. Reviewers do not implement/fix the task they review; the orchestrator coordinates findings and can reuse the builder or spawn a new Luna fixer.
 - **Do not delegate planning to Luna.** The owner explicitly corrected the initial request: the main agent must author the plan and future design updates.
-- **Current state: planning baseline published; pre-compaction readiness checked.** The owner accepted the design and Git decisions and authorized committing/pushing these planning files. No gameplay implementation or subagent work has started. Wait for an implementation task request; that request authorizes scoped implementation, independent reviews, bounded fixes and the accepted-task Git checkpoint.
+- **Current state: CK-00-01 accepted; next task awaits request.** Builder `/root/ck_00_01_builder` (`gpt-6-luna`) completed the cloud-scaffold audit. Separate reviewer `/root/ck_00_01_reviewer_r1` (`gpt-6-luna`) independently passed round 1 with no findings; the orchestrator accepted the verified submission. The accepted-task local Git checkpoint includes its documentation, handoff/review and this recovery update. No game source exists; CK-00-02 and later tasks await an owner request.
 
 The owner wants an ambitious, complex project that tests the agent's capabilities. Work in reviewable stages with evidence of actual behavior, while preserving the full intended 100-level scope.
 
@@ -32,7 +32,7 @@ CryptKeep is a first-person dungeon crawler with pixelated art.
 
 ## Workspace and inherited records
 
-- Repository checkout: `/workspace/CryptKeep`; branch: `master`, tracking `origin/master`. Remote: `origin`, `Guna210/CryptKeep` on GitHub. Baseline commit `a8df9b8787b7cc446510e2009e7c196ed718166c` was pushed and its remote SHA verified. Later planning-maintenance commits do not mean game tasks are accepted. Recheck Git status/log and remote state on resume.
+- Repository checkout: `/workspace/CryptKeep`; branch: `master`. Remote: `origin`, `Guna210/CryptKeep` on GitHub. The current cloud snapshot contains an `origin/master` ref but has no configured branch upstream; do not infer publication from `git status` alone. Baseline commit `a8df9b8787b7cc446510e2009e7c196ed718166c` was pushed and its remote SHA verified. Later planning-maintenance commits do not mean game tasks are accepted. Recheck Git status/log and remote state on resume.
 - Use Codex Cloud for development, dependencies, builds, and browser testing because the owner has limited local storage. Cloud development and public game hosting are separate decisions.
 - The published baseline contains the planning documents and pre-existing environment scaffold. Preserve unrelated owner changes; the uploaded BlockCraft reference is not part of the repository.
 - Existing `package.json` declares **TypeScript + Three.js + Vite**, with Vitest and Playwright tooling. The approved specification retains this browser stack. Do not replace it without a new design decision.
@@ -62,10 +62,19 @@ CryptKeep is a first-person dungeon crawler with pixelated art.
 | REVIEW-001 | Main orchestrator | Complete | Recorded separate Luna reviewers, original/new Luna fixers, repaired-snapshot verification and the maximum three-round workflow in REVIEW.md; linked SPEC and startup instructions. |
 | BASELINE-001 | Main orchestrator | Complete | Committed/pushed 15 planning/environment files as `a8df9b8` on `master`; remote SHA matched. |
 | RECOVERY-001 | Main orchestrator | Complete | Checked 196 tasks/20 milestones, dependency-index parity/final coverage, document links, approved decisions and package/config consistency; refreshed stale publication/resume instructions. Environment fixture passed all five checks. |
-| CK-00-01 | GPT-6 Luna; unassigned | Ready; not started | First implementation task: audit existing cloud scaffold. No prerequisites; launch only when the owner requests implementation. |
-| Remaining SPEC tasks | GPT-6 Luna; unassigned | Pending | No task is accepted or running; no builder agent or handoff exists yet. |
+| CK-00-01 | Builder `/root/ck_00_01_builder`; reviewer `/root/ck_00_01_reviewer_r1`; both `gpt-6-luna` | Accepted; round 1 PASS | Baseline `c1d87fdffb8aa308407c75fd81648a3ac3e80958`. Handoff: [progress/CK-00-01.md](progress/CK-00-01.md). Review: [reviews/CK-00-01/round-1.md](reviews/CK-00-01/round-1.md). Five fixture checks, configuration typecheck and pinned package consistency independently passed; no findings/fixes. |
+| CK-00-02 | GPT-6 Luna; unassigned | Ready; not started | Create the application shell. Accepted prerequisite: CK-00-01. Next task in document order; await owner request. |
+| Remaining 194 SPEC tasks | GPT-6 Luna; unassigned | Unaccepted; readiness per prerequisites | CK-00-04/05/06 also have accepted prerequisites; no further task is authorized or running. |
 
-No Luna work is completed or accepted. No builder/reviewer/fixer is active; no review round or finding exists. The orchestrator ran `npm run verify:environment`: TypeScript fixture compile, two Vitest fixture tests, Vite fixture build, HTTP serving and Chromium/Three.js pixel readback all passed. Node 24.19.0, npm 11.9.0, installed dependencies and system Chromium were observed. These are environment checks, not gameplay validation or acceptance of CK-00-01. No application source, entry point or game tests exist yet.
+One of 196 tasks is accepted: CK-00-01. No builder/reviewer/fixer is active; one review round was used, no findings or repair passes. Independently verified baseline: Node 24.19.0, npm 11.9.0, Chromium 151.0.7922.173, all eight pinned packages matching, five toolchain fixture checks passing (two Vitest tests and 1,352 rendered pixels), and configuration-only typecheck passing. These are environment checks, not gameplay validation. No application source, entry point or game tests exist yet.
+
+Reviewed round-1 SHA-256 manifest (historical submission; handoff has since received orchestrator acceptance metadata, with no change to README/startup docs):
+
+- `README.md`: `9c34d29735a91a008faebd54ec09596ac8aef8e96f6451ab120afc324fd911fb`.
+- `docs/environment-start.md`: `4c13694fab77e7fa592fa0d2fc368f07ad3eeafa96a22dbe0d16039a6906ca7f`.
+- `progress/CK-00-01.md`: `969f90ea33d681339062f2e4160de43be6b29f2fe1bc4bf3dd06fb1c9e71a83e`.
+
+The local accepted-task checkpoint uses commit message `CK-00-01: audit and verify the cloud scaffold`; inspect Git for its SHA on resume. This task request authorized the local checkpoint; the task commit has not been pushed. Previously published `origin/master` was at `c1d87fd`; recheck publication state if the owner requests a push.
 
 When implementation begins, track active tasks and accepted-task summaries here, with builder/reviewer/fixer agent IDs and models, stage, round (1–3), reviewed snapshot, handoff/report links, acceptance evidence, unresolved finding IDs and next action. Keep full reports in per-task records rather than copying them here. Distinguish submitted work from independently reviewed/accepted work; the orchestrator makes the final acceptance decision. Resume recorded rounds after compaction without resetting counters or duplicating agents.
 
@@ -82,4 +91,4 @@ When implementation begins, track active tasks and accepted-task summaries here,
 
 ## Immediate next action
 
-Wait for the owner's implementation task request or design correction. Do not recreate/re-push the baseline or count environment checks as an accepted task. `Start CK-00-01` or `Start the next task` begins the scaffold audit through an explicitly selected `gpt-6-luna` builder, followed by independent review and the accepted-task commit. Read SPEC.md Section 0, REVIEW.md, docs/environment-start.md and that card; preserve the main-agent planner/orchestrator role. If a requested task's prerequisites are unaccepted, report the specific blocker instead of silently implementing unrelated work.
+Wait for the owner's next task or broader milestone request. `Start the next task` selects CK-00-02; read its card and the accepted CK-00-01 handoff/review, then launch a new explicitly selected `gpt-6-luna` builder and independent reviewer under the existing protocol. Do not restart the completed audit, duplicate its agents or begin the application shell automatically. Preserve the main-agent orchestrator/planner role.
