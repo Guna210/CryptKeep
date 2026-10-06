@@ -1,5 +1,6 @@
 import type { RendererResourceCounts } from "../render/renderer";
 import type { FloorSessionSnapshot } from "../app/floor-session";
+import type { PlayerSessionSnapshot } from "../app/player-session";
 
 export type AppReadiness = "initializing" | "ready" | "unsupported";
 
@@ -7,6 +8,7 @@ export interface DiagnosticSnapshot {
   readiness: AppReadiness;
   renderer: Readonly<RendererResourceCounts> | null;
   floor: Readonly<FloorSessionSnapshot> | null;
+  player: Readonly<PlayerSessionSnapshot> | null;
 }
 
 declare global {
@@ -21,12 +23,13 @@ export function installDiagnostics(
   getReadiness: () => AppReadiness,
   getRendererCounts: () => RendererResourceCounts | null,
   getFloorSnapshot: () => Readonly<FloorSessionSnapshot> | null = () => null,
+  getPlayerSnapshot: () => Readonly<PlayerSessionSnapshot> | null = () => null,
 ): { dispose(): void } {
   const api = Object.freeze({
     snapshot(): Readonly<DiagnosticSnapshot> {
       const counts = getRendererCounts();
       const renderer = counts ? Object.freeze({ ...counts }) : null;
-      return Object.freeze({ readiness: getReadiness(), renderer, floor: getFloorSnapshot() });
+      return Object.freeze({ readiness: getReadiness(), renderer, floor: getFloorSnapshot(), player:getPlayerSnapshot() });
     },
   });
   Object.defineProperty(window, "__cryptkeepDiagnostics", {

@@ -8,6 +8,7 @@ export interface AppShell {
   readonly statusLabel: HTMLElement;
   readonly statusMessage: HTMLElement;
   readonly legend: HTMLElement;
+  readonly exploreButton: HTMLButtonElement;
   readonly context: WebGL2RenderingContext | null;
   dispose(): void;
 }
@@ -64,7 +65,7 @@ export function createAppShell(root: HTMLElement, options: ShellOptions = {}): A
   legend.innerHTML = '<span class="entry">Entry</span><span class="boss">Boss</span><span class="reward">Reward</span><span class="exit">Exit</span>';
   const panel = document.createElement("section");
   panel.className = "cryptkeep__panel";
-  panel.append(brand, controls, legend);
+  panel.append(brand, controls, legend, exploreButton, help);
   overlay.append(panel);
   root.replaceChildren(canvas, overlay);
 
@@ -84,9 +85,19 @@ export function createAppShell(root: HTMLElement, options: ShellOptions = {}): A
     statusLabel,
     statusMessage,
     legend,
+    exploreButton,
     context,
     dispose() {
       root.replaceChildren();
     },
   };
 }
+  const exploreButton = document.createElement("button");
+  exploreButton.type = "button";
+  exploreButton.className = "cryptkeep__explore";
+  exploreButton.textContent = "Explore dungeon";
+  exploreButton.setAttribute("aria-describedby", "cryptkeep-help");
+  const help = document.createElement("p");
+  help.id = "cryptkeep-help";
+  help.className = "cryptkeep__help";
+  help.textContent = "WASD move · Mouse look · Escape release mouse";

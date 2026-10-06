@@ -37,7 +37,7 @@ html, body, #app {
   pointer-events: none;
 }
 
-.cryptkeep__panel { width: min(19rem, calc(100vw - 2rem)); padding: 1rem; background: rgb(9 11 16 / 86%); border: 1px solid #554536; box-shadow: 0 5px 24px #0008; pointer-events: auto; }
+.cryptkeep__panel { width: min(19rem, calc(100vw - 2rem)); padding: 0.75rem; background: rgb(9 11 16 / 78%); border: 1px solid #554536; box-shadow: 0 5px 24px #0008; pointer-events: auto; }
 
 .cryptkeep__brand {
   width: 100%;
@@ -88,6 +88,12 @@ html, body, #app {
 .cryptkeep__legend .boss { color: #ff5149; }
 .cryptkeep__legend .reward { color: #68e078; }
 .cryptkeep__legend .exit { color: #f5c44d; }
+.cryptkeep__explore { width:100%; min-height:2.4rem; margin-top:0.75rem; padding:.45rem; color:#eee3ca; background:#493525; border:1px solid #78634b; font:inherit; cursor:pointer; }
+.cryptkeep__help { margin:.55rem 0 0; color:#b9b4a6; font-size:.68rem; line-height:1.4; }
+.cryptkeep__overlay--playing { pointer-events:none; }
+.cryptkeep__overlay--playing .cryptkeep__panel { opacity:.48; pointer-events:auto; }
+.cryptkeep__overlay--playing .cryptkeep__controls { display:none; }
+.cryptkeep__overlay--playing .cryptkeep__panel:focus-within, .cryptkeep__overlay--playing .cryptkeep__panel:hover { opacity:1; }
 
 .cryptkeep__overlay--unsupported {
   background: rgb(8 10 14 / 90%);

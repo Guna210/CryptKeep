@@ -44,6 +44,12 @@ export class PointerCapture {
 
   get state(): PointerCaptureState { return this.stateValue; }
 
+  /** Cancel pending input and release this surface's lock through the normal policy path. */
+  release(reason: InputCancellationReason = "pause"): void {
+    if (this.disposed) return;
+    this.cancel(reason);
+  }
+
   /** Invoke from a trusted click/Resume gesture. Failed capture never retries automatically. */
   requestFromGesture(): void {
     if (this.disposed || this.stateValue === "captured" || this.stateValue === "requesting") return;
