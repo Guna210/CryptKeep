@@ -44,7 +44,7 @@ The orchestrator supplies a self-contained task packet rather than relying on th
 - Builder handoff, actual commands/results, screenshot paths, known limitations and prior round reports.
 - Required acceptance cases and permitted check commands, plus the report output paths.
 
-The reviewer should receive the requirements and evidence, not an instruction to endorse the builder's conclusion. Use a fresh agent with a scoped packet; do not reuse the builder as reviewer.
+The reviewer should receive the requirements and evidence, not an instruction to endorse the builder's conclusion. Use a fresh agent with `model: "gpt-6-luna"`, `fork_turns: "none"` and a self-contained review packet; do not reuse the builder as reviewer. Include docs/environment-start.md for cloud/browser check execution. The main-agent role described in CONTEXT does not make this child the orchestrator.
 
 ## Review procedure
 

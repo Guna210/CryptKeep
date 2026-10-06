@@ -20,7 +20,7 @@ Writing this specification authorizes planning only. A later request such as **â
 
 1. Read `CONTEXT.md`, this task card, the referenced design sections, and accepted prerequisite handoffs. Inspect applicable `AGENTS.md` instructions and existing owner changes.
 2. Confirm that prerequisite tasks are accepted, and that owned files are available. Existing tooling is verified and extended, not rebuilt automatically.
-3. Spawn a subagent with **model `gpt-6-luna`** explicitly. Never use Luna to author the project plan. If that model is unavailable, report the blocker rather than substituting silently.
+3. Spawn a subagent with **model `gpt-6-luna`** and **`fork_turns: "none"`**, supplying a self-contained authorized task packet. Explicitly assign its builder/fixer/reviewer role; CONTEXT's main-agent role does not transfer to the child. Never use Luna to author the project plan. If that model is unavailable, report the blocker rather than substituting silently.
 4. Give it the delegation packet below. The main agent coordinates, reviews, runs checks, and maintains planning/progress records; builders write and fix application code.
 5. After implementation, spawn a separate **`gpt-6-luna` reviewer**. Follow [REVIEW.md](REVIEW.md): a fresh reviewer per round; confirmed findings go to the original builder or a new Luna fixer; the round's reviewer verifies the repaired submission. The main agent may supply instructions missing from this specification, consistent with owner requirements and task scope.
 6. Use at most **three review/repair rounds per task**, stopping early on a clean result. After the third repair, its reviewer verifies the final snapshot within that round; no fourth round or extra repair pass starts automatically. Unresolved issues leave the task unaccepted and are reported to the owner. No coordinator-built fallback implementation.
@@ -28,7 +28,7 @@ Writing this specification authorizes planning only. A later request such as **â
 
 Tasks are intentionally smaller than milestones. A task should introduce one algorithm, one state machine, one UI component, one content family, or one bounded integration. If a task requires multiple independent algorithms or exceeds a reviewable change, split it into `CK-XX-YY.a`, `.b`, etc., update the dependency graph, and keep the parent open until its children are accepted. Do not use task size as a reason to omit required behavior.
 
-Use the owner's approved Git checkpoint workflow in Section 0.5. No automatic PR-per-task, hosting or deployment is required. Push only within the owner's authorized scope; the current push request covers the planning/environment baseline. Shared workspace agents do not need a worktree by default. Run parallel agents only when requested, prerequisites are accepted, and file ownership is disjoint; shared composition roots, registries, and configuration require serialized integration tasks.
+Use the owner's approved Git checkpoint workflow in Section 0.5. No automatic PR-per-task, hosting or deployment is required. Push only within the owner's authorized scope; the planning/environment baseline has been published, and implementation pushes follow the owner's task instructions. Shared workspace agents do not need a worktree by default. Run parallel agents only when requested, prerequisites are accepted, and file ownership is disjoint; shared composition roots, registries, and configuration require serialized integration tasks.
 
 ### 0.3 Delegation packet
 
@@ -53,7 +53,7 @@ Task cards own only the named module/file family and its colocated `*.test.ts`, 
 
 ### 0.5 Git checkpoint workflow
 
-Create one baseline commit containing the planning documents and existing reproducible cloud environment scaffold. The owner explicitly requested committing and pushing this baseline to `Guna210/CryptKeep`; the remote's configured default branch is `master`.
+The planning documents and reproducible cloud environment scaffold were committed and pushed to `Guna210/CryptKeep` on `master` under the owner's instruction. Publication state is recorded in CONTEXT.md and Git; do not recreate the baseline. Planning/recovery documentation can have separate maintenance commits, which do not advance the implementation-task ledger.
 
 After each later task passes independent review and is accepted, create one commit containing that task's implementation/tests, handoff/review records and orchestrator progress update. Include the task ID in the commit message. Intermediate repair rounds stay within the task and do not require separate published commits. Stage explicit relevant paths, preserve unrelated owner edits, and check the staged diff. The orchestrator may create Git checkpoints as coordination work while Luna remains responsible for code changes.
 
