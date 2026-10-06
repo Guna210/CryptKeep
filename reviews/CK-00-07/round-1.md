@@ -23,3 +23,20 @@ None. I found no confirmed defect against the task card or the explicit dispatch
 ## Verdict
 
 **PASS** — no repair pass required. No required check is unverified.
+
+## Frozen submission manifest
+
+The original round-1 snapshot manifest is embedded here so the report retains its identity independently of temporary files or later handoff metadata edits:
+
+```json
+{
+  "task": "CK-00-07",
+  "round": 1,
+  "baseline": "785bf893bbbf2d8c64d08c7621cf20edce9ba450",
+  "files": {
+    "src/core/events.ts": "2aa57ccf9307164eb6c412900330156931ddd13557d38964b19f39f0149bb819",
+    "src/core/events.test.ts": "9109362525d1d147dbd4b338ab6d0b594663b2c53d84c311c6a5a841b4e43dd6",
+    "progress/CK-00-07.md": "5653d391a4e85fe4a8b69249d6f285661eea3c463a5190adec441f4237a729f7"
+  }
+}
+```
