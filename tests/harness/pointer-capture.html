@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Pointer capture proof</title>
+    <style>
+      body { margin: 0; min-height: 100vh; color: white; background: #171411; font: 16px sans-serif; }
+      main { display: grid; gap: 1rem; justify-items: center; padding: 2rem; }
+      #surface { display: grid; place-items: center; width: min(80vw, 40rem); height: 18rem; background: #392b20; border: 2px solid #d6a85f; }
+      button { padding: 0.7rem 1rem; }
+      output { min-height: 1.5rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Pointer capture proof</h1>
+      <button id="capture" type="button">Capture pointer</button>
+      <button id="denied" type="button">Simulate denied capture</button>
+      <div id="surface" tabindex="0">Gameplay surface</div>
+      <output id="status" aria-live="polite">Pointer capture idle</output>
+    </main>
+    <script type="module" src="/tests/harness/pointer-capture.ts"></script>
+  </body>
+</html>
