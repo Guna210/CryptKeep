@@ -22,7 +22,7 @@ To repeat only the setup validation, run `npm run verify:environment`. See [docs
 
 ## Application commands
 
-`npm run dev` serves the current preview and `npm run build` builds it. `npm run typecheck` checks the app and shared tooling; `npm run test:e2e` runs browser checks against Vite, including actual WebGL rendering and renderer lifecycle. `npm test` currently exits because no Vitest test files exist. The preview is not playable gameplay. `verify:environment` runs generated fixtures only and must not be reported as gameplay validation. Playwright uses the system Chromium binary and the launch flags validated by the environment check; no browser download is required.
+`npm run dev` serves the current preview and `npm run build` builds it. `npm run typecheck` checks the app and shared tooling; `npm test` runs deterministic fixed-step clock unit tests. The clock is a standalone core utility and is not wired into gameplay yet. `npm run test:e2e` runs browser checks against Vite, including actual WebGL rendering and renderer lifecycle. The preview is not playable gameplay. `verify:environment` runs generated fixtures only and must not be reported as gameplay validation. Playwright uses the system Chromium binary and the launch flags validated by the environment check; no browser download is required.
 
 ## Runtime and storage notes
 
