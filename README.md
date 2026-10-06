@@ -6,7 +6,7 @@ CryptKeep is planned as a browser-based first-person dungeon crawler using TypeS
 
 [SPEC.md](SPEC.md) defines the complete 100-level game and 196 small implementation tasks across 20 milestones. Each task includes dependencies, file ownership, acceptance checks and evidence requirements. The main agent plans and orchestrates; GPT-6 Luna subagents implement assigned tasks. Separate Luna agents review submissions under [REVIEW.md](REVIEW.md), with at most three review/repair rounds per task. [CONTEXT.md](CONTEXT.md) records current progress and recovery information. For the current audit, review and acceptance status, see [CONTEXT.md](CONTEXT.md) and [progress/CK-00-01.md](progress/CK-00-01.md). No gameplay implementation has started.
 
-Approved direction: single-player desktop browser, pixel-textured 3D rooms/creatures, five weapon classes, ten regions and floor-entry checkpoint retry. Target ordinary floors at 3–6 minutes and the full campaign at approximately 5–10 hours, to be tested and tuned. Git checkpoints use one baseline commit followed by one commit per accepted task.
+Approved direction: single-player desktop browser, pixel-textured 3D rooms/creatures, five weapon classes, ten regions and floor-entry checkpoint retry. Target ordinary floors at 3–6 minutes and the full campaign at approximately 5–10 hours, to be tested and tuned. Git checkpoints use one baseline commit followed by one commit per accepted task; every accepted task is pushed, including trivial, documentation and tooling work.
 
 ## Cloud setup
 
