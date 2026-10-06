@@ -28,3 +28,18 @@ None.
 ## Verdict
 
 **PASS** — independently verified against the exact eight-path submission snapshot. The required full verification and focused timing/corner checks passed.
+
+## Orchestrator snapshot receipt
+
+The reviewer checked this complete submitted mapping before and after review. Main preserves it here as coordination metadata so the receipt survives replacement of the temporary workspace. Later acceptance/publication annotations change only the handoff; application and test bytes remain as reviewed.
+
+| Path | Submitted SHA-256 |
+| --- | --- |
+| `README.md` | `3a57c5043382e1639ad2eb60ad5a8e8a840164314ff2f2dd7d37bc90b3c76ed2` |
+| `docs/environment-start.md` | `18531f2e6e25533c4024749aec02568797f4783ee4674ec41c86f5d64d4e786c` |
+| `src/app/player-session.ts` | `0cb4fd1f49ceb7f0399e890013072ad7ff9c2fd10ccab75617b53d12105d8493` |
+| `src/app/shell.ts` | `43bfa44334c04e03df5cbb0cd3becd058b1a2cbf1edbb3d40b429d3607558f64` |
+| `src/player/dash.ts` | `39aed58505b41201b9cb78bbe36b8bed2ae434957f2b3f730f06bf6361ee1126` |
+| `src/player/dash.test.ts` | `d8c37f3fdc6220641ead1528b5889b6890915bd35772590868f4bf3ce8056d7b` |
+| `tests/e2e/dash.spec.ts` | `68a8eac0196dc7452c7e64000986d6f18e7cdc898c3cc4dae9418ad191240f06` |
+| `progress/CK-02-07.md` | `fbc1aaa4022fd9af9d1e1027c5e7383fb57f820116dc1d670bf13d3a58bf7410` |
