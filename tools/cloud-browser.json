@@ -1,0 +1,10 @@
+{
+  "args": [
+    "--no-sandbox",
+    "--disable-dev-shm-usage",
+    "--enable-webgl",
+    "--ignore-gpu-blocklist",
+    "--use-gl=angle",
+    "--use-angle=swiftshader"
+  ]
+}

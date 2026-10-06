@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+.cache/
+.environment-smoke/
+playwright-report/
+test-results/
+.DS_Store
