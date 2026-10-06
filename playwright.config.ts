@@ -6,14 +6,7 @@ export default defineConfig({
   outputDir: "./test-results",
   reporter: "list",
   workers: 2,
-  webServer: {
-    command: "npm run dev -- --host 127.0.0.1 --port 5173 --strictPort",
-    url: "http://127.0.0.1:5173/",
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-  },
   use: {
-    baseURL: "http://127.0.0.1:5173",
     browserName: "chromium",
     headless: true,
     launchOptions: {
@@ -21,4 +14,12 @@ export default defineConfig({
       args: browserConfig.args,
     },
   },
+  webServer: [
+    { command: "npm run dev -- --host 127.0.0.1 --port 5173 --strictPort", url: "http://127.0.0.1:5173/", reuseExistingServer: !process.env.CI, timeout: 30_000 },
+    { command: "npm run preview -- --host 127.0.0.1 --port 4173 --strictPort", url: "http://127.0.0.1:4173/", reuseExistingServer: !process.env.CI, timeout: 30_000 },
+  ],
+  projects: [
+    { name: "development", testIgnore: /production\.spec\.ts$/, use: { baseURL: "http://127.0.0.1:5173" } },
+    { name: "production", testMatch: /production\.spec\.ts$/, use: { baseURL: "http://127.0.0.1:4173" } },
+  ],
 });
