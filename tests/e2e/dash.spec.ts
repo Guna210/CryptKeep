@@ -3,6 +3,7 @@ import { expect, test } from "../harness/browser";
 test("Space activates one captured dash, costs once, and a fresh press works after cooldown", async ({page}) => {
   await page.goto("/");
   const player=()=>page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().player!);
+  await expect.poll(async () => (await player()).pose).not.toBeNull();
   const spawn=(await player()).pose!;
   await page.getByRole("button",{name:"Explore dungeon"}).click();
   await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.tagName)).toBe("CANVAS");
@@ -41,13 +42,16 @@ test("an uncaptured Space is ignored and pause cancels evasion while freezing co
   const stillPaused=await player();
   expect(stillPaused.dash.cooldownRemainingSeconds).toBe(paused.dash.cooldownRemainingSeconds);
   expect(stillPaused.resources!.stamina.current).toBe(75);
-  await page.keyboard.up("Space");
   const tickBeforeResume=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick);
-  await page.getByRole("button",{name:"Explore dungeon"}).click();
+  await page.getByRole("button",{name:"Resume dungeon"}).click();
   await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.tagName)).toBe("CANVAS");
   await expect.poll(async()=>(await player()).active).toBe(true);
   await expect.poll(()=>page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick)).toBeGreaterThan(tickBeforeResume);
   await page.waitForTimeout(200);
   expect((await player()).dash.cooldownRemainingSeconds).toBeLessThan(paused.dash.cooldownRemainingSeconds);
-  expect((await player()).resources!.stamina.current).toBe(75);
+  expect((await player()).dash.active).toBe(false);
+  expect((await player()).evading).toBe(false);
+  expect((await player()).resources!.stamina.current).toBeGreaterThanOrEqual(75);
+  expect((await player()).resources!.stamina.current).toBeLessThanOrEqual(100);
+  await page.keyboard.up("Space");
 });

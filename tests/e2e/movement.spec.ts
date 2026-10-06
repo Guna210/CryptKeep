@@ -24,16 +24,16 @@ test("real player input moves, mouse changes the camera, and release stops motio
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
   await page.keyboard.down("w");
   await page.waitForTimeout(300);
-  await page.evaluate(() => document.querySelector(".cryptkeep__overlay")?.classList.remove("cryptkeep__overlay--playing"));
-  await page.getByLabel("Dungeon seed").focus();
-  expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("INPUT");
+  await page.evaluate(() => document.querySelector(".cryptkeep__overlay")?.classList.remove("cryptkeep__overlay--playing", "cryptkeep__overlay--session-started"));
+  // Synthetic focusin exercises the editable-target guard while capture normally hides the seed form.
+  await page.getByLabel("Dungeon seed").evaluate((input) => input.dispatchEvent(new FocusEvent("focusin", {bubbles:true})));
   await expect.poll(async () => (await player()).capture).toBe("idle");
   const focusedPose = (await player()).pose;
   expect((await player()).active).toBe(false);
   await page.waitForTimeout(250);
   expect((await player()).pose).toEqual(focusedPose);
   await page.keyboard.up("w");
-  await page.getByRole("button", {name:"Explore dungeon"}).click();
+  await page.getByRole("button", {name:"Resume dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("Gameplay canvas has no layout box");
@@ -57,7 +57,7 @@ test("real player input moves, mouse changes the camera, and release stops motio
   const stoppedAt = released.pose;
   await page.waitForTimeout(250);
   expect((await player()).pose).toEqual(stoppedAt);
-  await page.getByRole("button", {name:"Explore dungeon"}).click();
+  await page.getByRole("button", {name:"Resume dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
   await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", {key:"w", repeat:true, bubbles:true, cancelable:true})));
   await page.waitForTimeout(250);
@@ -139,11 +139,25 @@ test("swept movement stops at a generated wall with the full player circle clear
   await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.tagName)).toBe("CANVAS");
   const box=await page.locator("canvas").boundingBox();
   if(!box) throw new Error("Gameplay canvas has no layout box");
+  const waitForSettledLook=async()=>{
+    let lastTick=-1,lastYaw=Number.NaN,stableSamples=0;
+    await expect.poll(async()=>{
+      const snapshot=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot());
+      const tick=snapshot.floor!.tick, yaw=snapshot.player!.pose!.yaw, look=snapshot.player!.lastSample?.look;
+      if(tick>lastTick){
+        stableSamples=look?.x===0&&look?.y===0&&yaw===lastYaw?stableSamples+1:0;
+        lastTick=tick;lastYaw=yaw;
+      }
+      return stableSamples;
+    },{timeout:5000}).toBeGreaterThanOrEqual(3);
+  };
   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+  await waitForSettledLook();
   const facing=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().player!.pose!.yaw);
   const yawDelta=Math.atan2(Math.sin(target.yaw-facing),Math.cos(target.yaw-facing));
   let remaining=-yawDelta/0.002, movedX=0;
   while(Math.abs(remaining)>0.1){const delta=Math.sign(remaining)*Math.min(120,Math.abs(remaining));movedX+=delta;await page.mouse.move(box.x+box.width/2+movedX,box.y+box.height/2);remaining-=delta;}
+  await waitForSettledLook();
   await expect.poll(()=>page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().player!.pose!.yaw)).toBeCloseTo(target.yaw,2);
   const spawn=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().player!.pose!);
   await page.keyboard.down("w");
@@ -158,6 +172,7 @@ test("swept movement stops at a generated wall with the full player circle clear
   const stopped=finalPlayer.pose!;
   expect(isPoseValid(floor,stopped)).toBe(true);
   const progress=(stopped.x-spawn.x)*target.direction.x+(stopped.z-spawn.z)*target.direction.z;
+  if(progress>target.distance+0.02) console.log("Wall fixture overshoot",JSON.stringify({target,targetYaw:target.yaw,spawn,stopped,progress,tick:await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick),lastSample:finalPlayer.lastSample}));
   expect(progress).toBeGreaterThan(target.distance-0.06);
   expect(progress).toBeLessThanOrEqual(target.distance+0.02);
   expect(finalPlayer.velocity!.x*target.direction.x+finalPlayer.velocity!.z*target.direction.z).toBe(0);
@@ -176,40 +191,55 @@ test("swept movement stops at a generated wall with the full player circle clear
   browserHarness.assertNoErrors();
 });
 
-test("pagehide removes the retained Explore listener and cannot revive the app", async ({ page, browserHarness }) => {
+test("pagehide removes retained Explore and Resume listeners and neither can revive the app", async ({ page, browserHarness }) => {
   await page.addInitScript(() => {
-    const listeners = new Set<EventListenerOrEventListenerObject>();
+    const exploreListeners = new Set<EventListenerOrEventListenerObject>();
+    const resumeListeners = new Set<EventListenerOrEventListenerObject>();
     const focusListeners = new Set<EventListenerOrEventListenerObject>();
     const add = EventTarget.prototype.addEventListener;
     const remove = EventTarget.prototype.removeEventListener;
     EventTarget.prototype.addEventListener = function(type, listener, options) {
-      if (type === "click" && listener && this instanceof HTMLElement && this.classList.contains("cryptkeep__explore")) listeners.add(listener);
+      if (type === "click" && listener && this instanceof HTMLElement && this.classList.contains("cryptkeep__explore")) exploreListeners.add(listener);
+      if (type === "click" && listener && this instanceof HTMLElement && this.classList.contains("cryptkeep__resume")) resumeListeners.add(listener);
       if (type === "focusin" && listener && this === document) focusListeners.add(listener);
       return add.call(this, type, listener, options);
     };
     EventTarget.prototype.removeEventListener = function(type, listener, options) {
-      if (type === "click" && listener && this instanceof HTMLElement && this.classList.contains("cryptkeep__explore")) listeners.delete(listener);
+      if (type === "click" && listener && this instanceof HTMLElement && this.classList.contains("cryptkeep__explore")) exploreListeners.delete(listener);
+      if (type === "click" && listener && this instanceof HTMLElement && this.classList.contains("cryptkeep__resume")) resumeListeners.delete(listener);
       if (type === "focusin" && listener && this === document) focusListeners.delete(listener);
       return remove.call(this, type, listener, options);
     };
-    Object.defineProperty(window, "__exploreListenerCount", {get:() => listeners.size});
+    Object.defineProperty(window, "__exploreListenerCount", {get:() => exploreListeners.size});
+    Object.defineProperty(window, "__resumeListenerCount", {get:() => resumeListeners.size});
     Object.defineProperty(window, "__focusListenerCount", {get:() => focusListeners.size});
   });
   await page.goto("/");
   await expect(page.getByText("DUNGEON PREVIEW")).toBeVisible();
   expect(await page.evaluate(() => (window as Window & {__focusListenerCount:number}).__focusListenerCount)).toBe(1);
-  const retained = await page.getByRole("button", {name:"Explore dungeon"}).evaluate((button) => {
+  await page.getByRole("button", {name:"Explore dungeon"}).evaluate((button) => {
     (window as Window & {__retainedExplore?:HTMLButtonElement}).__retainedExplore = button as HTMLButtonElement;
-    return true;
   });
-  expect(retained).toBe(true);
   expect(await page.evaluate(() => (window as Window & {__exploreListenerCount:number}).__exploreListenerCount)).toBe(1);
+  await page.getByRole("button", {name:"Explore dungeon"}).click();
+  await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", {name:"Resume dungeon"})).toBeVisible();
+  await page.getByRole("button", {name:"Resume dungeon"}).evaluate((button) => {
+    (window as Window & {__retainedResume?:HTMLButtonElement}).__retainedResume = button as HTMLButtonElement;
+  });
+  expect(await page.evaluate(() => (window as Window & {__resumeListenerCount:number}).__resumeListenerCount)).toBe(1);
   await page.evaluate(() => { window.dispatchEvent(new Event("pagehide")); window.dispatchEvent(new Event("pagehide")); });
   expect(await page.evaluate(() => (window as Window & {__exploreListenerCount:number}).__exploreListenerCount)).toBe(0);
+  expect(await page.evaluate(() => (window as Window & {__resumeListenerCount:number}).__resumeListenerCount)).toBe(0);
   expect(await page.evaluate(() => (window as Window & {__focusListenerCount:number}).__focusListenerCount)).toBe(0);
   expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
   expect(await page.evaluate(() => document.querySelector("#app")?.childElementCount)).toBe(0);
-  await page.evaluate(() => (window as Window & {__retainedExplore:HTMLButtonElement}).__retainedExplore.click());
+  await page.evaluate(() => {
+    const retained = window as Window & {__retainedExplore:HTMLButtonElement; __retainedResume:HTMLButtonElement};
+    retained.__retainedExplore.click();
+    retained.__retainedResume.click();
+  });
   expect(await page.evaluate(() => document.pointerLockElement)).toBe(null);
   expect(await page.evaluate(() => document.querySelector("#app")?.childElementCount)).toBe(0);
   browserHarness.assertNoErrors();

@@ -2,6 +2,8 @@ import "./ui/shell.css";
 import { createAppShell } from "./app/shell";
 import { FloorSession } from "./app/floor-session";
 import { PlayerSession } from "./app/player-session";
+import { PauseCoordinator } from "./app/pause";
+import { createMinimalPauseUI } from "./ui/pause-minimal";
 import { createRenderedFloor } from "./render/floor";
 import { createMaterialLibrary } from "./render/materials";
 import { createWorldRenderer } from "./render/renderer";
@@ -18,6 +20,13 @@ let raf = 0;
 let stopped = false;
 let form: HTMLFormElement | null = null;
 let formSubmitListener: ((event: SubmitEvent) => void) | null = null;
+const pauseUI = createMinimalPauseUI(shell.overlay, onResume);
+const pauseCoordinator = new PauseCoordinator(!shell.context, (snapshot) => {
+  pauseUI.render(snapshot);
+  shell.overlay.classList.toggle("cryptkeep__overlay--playing", snapshot.phase === "playing");
+  shell.overlay.classList.toggle("cryptkeep__overlay--session-started", snapshot.phase === "playing" || snapshot.phase === "paused" || snapshot.phase === "requesting" || snapshot.phase === "waiting");
+  shell.exploreButton.disabled = snapshot.phase !== "available";
+});
 const diagnostics = import.meta.env.DEV
   ? installDiagnostics(() => readiness, () => world?.getResourceCounts() ?? null, () => session?.snapshot() ?? null, () => player?.snapshot() ?? null)
   : null;
@@ -36,13 +45,14 @@ function frame(timestamp: number): void {
   raf = requestAnimationFrame(frame);
 }
 function pause(reason: "blur" | "hidden" | "pause"): void { player?.release(reason); }
-function resume(_reason: string): void { /* Focus never resumes gameplay without a fresh gesture. */ }
 function teardown(): void {
   if (stopped) return;
   stopped = true;
   cleanup(() => cancelAnimationFrame(raf));
   const ownedPlayer = player; player = null;
   cleanup(() => ownedPlayer?.dispose());
+  cleanup(() => pauseCoordinator.dispose());
+  cleanup(() => pauseUI.dispose());
   const ownedSession = session; session = null;
   cleanup(() => ownedSession?.dispose());
   const ownedWorld = world; world = null;
@@ -53,13 +63,11 @@ function teardown(): void {
   cleanup(() => shell.exploreButton.removeEventListener("click", onExplore));
   cleanup(() => document.removeEventListener("visibilitychange", onVisibility));
   cleanup(() => window.removeEventListener("blur", onBlur));
-  cleanup(() => window.removeEventListener("focus", onFocus));
   cleanup(() => window.removeEventListener("pagehide", teardown));
   cleanup(() => shell.dispose());
 }
-function onVisibility(): void { document.hidden ? pause("hidden") : resume("visible"); }
+function onVisibility(): void { if (document.hidden) pause("hidden"); }
 function onBlur(): void { pause("blur"); }
-function onFocus(): void { resume("focus"); }
 
 window.addEventListener("pagehide", teardown);
 
@@ -67,10 +75,12 @@ if (shell.context) {
   try {
     world = createWorldRenderer(shell.canvas, { context: shell.context, resizeTarget: root, includeDiagnosticFixture: false });
     session = new FloorSession(world, { createFloor:(generated, library) => createRenderedFloor(generated.plan, library, { ceilingVisible:true }) });
-    player = new PlayerSession(session, world, shell.canvas, (state) => {
-      shell.exploreButton.textContent = state === "captured" ? "Mouse captured · Escape to release" : "Explore dungeon";
-      if (state === "captured") shell.overlay.classList.add("cryptkeep__overlay--playing");
-      else shell.overlay.classList.remove("cryptkeep__overlay--playing");
+    player = new PlayerSession(session, world, shell.canvas, (state, reason) => {
+      if (state === "captured" && (stopped || readiness !== "ready" || document.hidden)) {
+        player?.release(document.hidden ? "hidden" : "pause");
+        return;
+      }
+      pauseCoordinator.captureChanged(state, reason);
       if (state === "captured") player?.resumeAfterCapture(performance.now());
     });
     const playerSession = player;
@@ -83,19 +93,22 @@ if (shell.context) {
       status("LOADING", "Generating your dungeon…");
       readiness = "initializing";
       shell.overlay.setAttribute("aria-busy", "true");
+      pauseCoordinator.loading();
       try {
         await playerSession.load(seed);
         if (stopped) return;
         readiness = "ready";
         status("DUNGEON PREVIEW", `Floor 1 · Seed ${session.snapshot().campaignSeed}`);
+        pauseCoordinator.ready();
       } catch (error) {
         if (stopped) return;
         readiness = "ready";
         status("GENERATION FAILED", error instanceof Error ? error.message : "The dungeon could not be generated. Check the seed and try again.");
+        if (session?.snapshot().currentFloors) pauseCoordinator.ready();
+        else pauseCoordinator.unavailable();
       } finally {
         if (!stopped) {
           shell.generateButton.disabled = false;
-          shell.exploreButton.disabled = false;
           shell.seedInput.disabled = false;
           shell.overlay.removeAttribute("aria-busy");
         }
@@ -109,7 +122,6 @@ if (shell.context) {
     shell.exploreButton.addEventListener("click", onExplore);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("blur", onBlur);
-    window.addEventListener("focus", onFocus);
     status("LOADING", "Preparing the dungeon preview…");
     player.input; // Keep the player session alive across floor rerolls.
     raf = requestAnimationFrame(frame);
@@ -129,7 +141,13 @@ if (shell.context) {
 }
 
 function onExplore(): void {
-  if (!player) return;
-  if (player.capture.state === "captured") { player.release("pause"); return; }
+  if (!player || stopped || readiness !== "ready" || document.hidden) return;
+  pauseCoordinator.resumeRequested();
+  player.requestFromGesture();
+}
+
+function onResume(): void {
+  if (!player || stopped || readiness !== "ready" || document.hidden) return;
+  pauseCoordinator.resumeRequested();
   player.requestFromGesture();
 }

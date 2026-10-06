@@ -89,9 +89,20 @@ html, body, #app {
 .cryptkeep__legend .reward { color: #68e078; }
 .cryptkeep__legend .exit { color: #f5c44d; }
 .cryptkeep__explore { width:100%; min-height:2.4rem; margin-top:0.75rem; padding:.45rem; color:#eee3ca; background:#493525; border:1px solid #78634b; font:inherit; cursor:pointer; }
+.cryptkeep__explore:disabled { opacity:.55; cursor:wait; }
+.cryptkeep__overlay--playing .cryptkeep__panel { display:none; }
+.cryptkeep__pause[hidden] { display:none; }
+.cryptkeep__pause { position:fixed; z-index:3; inset:50% auto auto 50%; transform:translate(-50%,-50%); width:min(25rem,calc(100vw - 2rem)); padding:1.25rem; color:#eee3ca; background:rgb(9 11 16 / 96%); border:1px solid #a17a50; box-shadow:0 8px 32px #000b; pointer-events:auto; }
+.cryptkeep__pause h2 { margin:0; color:#e1d6b9; font-size:1.3rem; }
+.cryptkeep__pause p { color:#c8c0ae; font-size:.85rem; line-height:1.5; }
+.cryptkeep__pause-message { min-height:2.5em; }
+.cryptkeep__resume { width:100%; min-height:2.75rem; padding:.55rem; color:#fff1d2; background:#493525; border:1px solid #c3925d; font:inherit; cursor:pointer; }
+.cryptkeep__resume:disabled { opacity:.7; cursor:wait; }
+.cryptkeep__resume:focus-visible, .cryptkeep__explore:focus-visible { outline:3px solid #68dce5; outline-offset:3px; }
 .cryptkeep__help { margin:.55rem 0 0; color:#b9b4a6; font-size:.68rem; line-height:1.4; }
 .cryptkeep__overlay--playing { pointer-events:none; }
 .cryptkeep__overlay--playing .cryptkeep__panel { opacity:.48; pointer-events:auto; }
+.cryptkeep__overlay--session-started .cryptkeep__legend, .cryptkeep__overlay--session-started .cryptkeep__explore, .cryptkeep__overlay--session-started .cryptkeep__help { display:none; }
 .cryptkeep__overlay--playing .cryptkeep__controls { display:none; }
 .cryptkeep__overlay--playing .cryptkeep__panel:focus-within, .cryptkeep__overlay--playing .cryptkeep__panel:hover { opacity:1; }
 

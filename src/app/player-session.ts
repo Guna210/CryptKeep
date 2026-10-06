@@ -10,7 +10,7 @@ import { activateDash, advanceDash, cancelDash, createDashState, resolveDashColl
 import type { WorldRenderer } from "../render/renderer";
 import type { RoleFloorPlan } from "../dungeon/roles";
 import type { FloorSession } from "./floor-session";
-import { createPointerCapture, type PointerCapture, type PointerCaptureState } from "./pointer-capture";
+import { createPointerCapture, type PointerCapture, type PointerCaptureReason, type PointerCaptureState } from "./pointer-capture";
 
 const KEY_ACTIONS: Readonly<Record<string, "moveForward" | "moveBackward" | "moveLeft" | "moveRight" | "primary" | "secondary" | "interact" | "heal" | "slotOne" | "slotTwo" | "inventory" | "map">> = {
   w:"moveForward", W:"moveForward", s:"moveBackward", S:"moveBackward", a:"moveLeft", A:"moveLeft", d:"moveRight", D:"moveRight",
@@ -82,7 +82,7 @@ export class PlayerSession {
   };
 
   constructor(private readonly floor: FloorSession, private readonly world: WorldRenderer, private readonly surface: HTMLElement,
-    private readonly onCaptureChange: (state: PointerCaptureState) => void = () => {}) {
+    private readonly onCaptureChange: (state: PointerCaptureState, reason?: PointerCaptureReason) => void = () => {}) {
     this.capture = createPointerCapture(surface, this.input, { onStateChange: (state, reason) => {
       if (state !== "captured") {
         this.input.clearInput(state === "failed" ? "pointer-lock-lost" : "pause");
@@ -91,7 +91,7 @@ export class PlayerSession {
         this.floor.pause(reason ?? "pause");
       }
       else this.active = !!this.state;
-      this.onCaptureChange(state);
+      this.onCaptureChange(state, reason);
     } });
     surface.ownerDocument.addEventListener("keydown", this.onKeyDown);
     surface.ownerDocument.addEventListener("focusin", this.onFocusIn);
