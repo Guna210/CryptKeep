@@ -1,10 +1,10 @@
 # CryptKeep
 
-CryptKeep is planned as a browser-based first-person dungeon crawler using TypeScript, Three.js, and Vite. The repository is currently in environment setup and planning: there is no game application, playable page, or game test suite yet.
+CryptKeep is a browser-based first-person dungeon crawler under development, built with TypeScript, Three.js, and Vite. The initial application shell is in place and reports its loading or WebGL 2 compatibility state; gameplay systems are being added in task-sized stages.
 
 ## Implementation plan
 
-[SPEC.md](SPEC.md) defines the complete 100-level game and 196 small implementation tasks across 20 milestones. Each task includes dependencies, file ownership, acceptance checks and evidence requirements. The main agent plans and orchestrates; GPT-6 Luna subagents implement assigned tasks. Separate Luna agents review submissions under [REVIEW.md](REVIEW.md), with at most three review/repair rounds per task. [CONTEXT.md](CONTEXT.md) records current progress and recovery information. For the current audit, review and acceptance status, see [CONTEXT.md](CONTEXT.md) and [progress/CK-00-01.md](progress/CK-00-01.md). No gameplay implementation has started.
+[SPEC.md](SPEC.md) defines the complete 100-level game and 196 small implementation tasks across 20 milestones. Each task includes dependencies, file ownership, acceptance checks and evidence requirements. [CONTEXT.md](CONTEXT.md) records live progress and recovery information. See [progress/CK-00-02.md](progress/CK-00-02.md) for the current shell implementation and verification evidence.
 
 Approved direction: single-player desktop browser, pixel-textured 3D rooms/creatures, five weapon classes, ten regions and floor-entry checkpoint retry. Target ordinary floors at 3–6 minutes and the full campaign at approximately 5–10 hours, to be tested and tuned. Git checkpoints use one baseline commit followed by one commit per accepted task; every accepted task is pushed, including trivial, documentation and tooling work.
 
@@ -20,9 +20,9 @@ The script installs the exact versions recorded in `package-lock.json` with `npm
 
 To repeat only the setup validation, run `npm run verify:environment`. See [docs/environment-start.md](docs/environment-start.md) for task startup instructions.
 
-## Future application commands
+## Application commands
 
-`npm run dev`, `npm run build`, `npm run typecheck`, `npm test`, and `npm run test:e2e` reserve the usual application workflows. There is no app entry point or game source to serve/build yet; typecheck currently checks the shared tool configuration only. No game unit or E2E tests exist. `verify:environment` runs generated fixtures only and must not be reported as gameplay validation. Playwright Test uses the system Chromium binary and the launch flags validated by the environment check; no browser download is required.
+`npm run dev` serves the current shell and `npm run build` builds it. `npm run typecheck` checks the app and shared tooling; `npm test` runs unit tests and `npm run test:e2e` runs browser checks against Vite. The current page is only an initialization/compatibility shell, not playable gameplay. `verify:environment` runs generated fixtures only and must not be reported as gameplay validation. Playwright uses the system Chromium binary and the launch flags validated by the environment check; no browser download is required.
 
 ## Runtime and storage notes
 

@@ -1,6 +1,6 @@
 # CryptKeep — Technical Specification and Task Plan
 
-Version: 1.0 · Written: 2026-10-06 · Implementation status: not started.
+Version: 1.0 · Written: 2026-10-06 · Live implementation status and evidence: [CONTEXT.md](CONTEXT.md) and per-task handoffs.
 
 **Audience:** the main coordinator/orchestrator and GPT-6 Luna builders, fixers and independent reviewers. The main agent owns this plan, delegation, acceptance, and continuity. Luna implements individually assigned tasks and separately reviews submissions under [REVIEW.md](REVIEW.md).
 
