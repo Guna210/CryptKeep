@@ -4,8 +4,9 @@ import { applyMouseLook } from "../player/look";
 import { stepLocomotion } from "../player/movement";
 import { moveCircleOnGrid } from "../player/collision";
 import { createPlayerState, type PlayerState } from "../player/state";
-import { advanceResourceRegeneration, createResourceRegenTimers, type ResourceRegenTimers } from "../player/resources";
+import { advanceResourceRegeneration, createResourceRegenTimers, recordStaminaSpend, type ResourceRegenTimers } from "../player/resources";
 import { commitSprintMovement, decideSprint, hasSprintMovement } from "../player/sprint";
+import { activateDash, advanceDash, cancelDash, createDashState, resolveDashCollision, type DashState } from "../player/dash";
 import type { WorldRenderer } from "../render/renderer";
 import type { RoleFloorPlan } from "../dungeon/roles";
 import type { FloorSession } from "./floor-session";
@@ -27,6 +28,8 @@ export interface PlayerSessionSnapshot {
   readonly resources: Readonly<{ health: PlayerState["health"]; stamina: PlayerState["stamina"]; mana: PlayerState["mana"] }> | null;
   readonly regenTimers: ResourceRegenTimers;
   readonly sprinting: boolean;
+  readonly dash: DashState;
+  readonly evading: boolean;
 }
 
 /** App-lifetime owner for native input, player simulation and camera presentation. */
@@ -41,10 +44,12 @@ export class PlayerSession {
   private lastSample: ReturnType<InputSampler["sample"]> | null = null;
   private regenTimers = createResourceRegenTimers();
   private sprinting = false;
+  private dash = createDashState();
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     const target = event.target;
     if (target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
     if (this.capture.state !== "captured" || !this.active) return;
+    if (event.code === "Space") { event.preventDefault(); if (!event.repeat) this.input.press("dash"); return; }
     if (event.code === "ShiftLeft") { event.preventDefault(); if (!event.repeat) this.input.press("sprint"); return; }
     const action = KEY_ACTIONS[event.key];
     if (!action) return;
@@ -61,6 +66,7 @@ export class PlayerSession {
   };
   private readonly onKeyUp = (event: KeyboardEvent): void => {
     if (this.capture.state !== "captured") return;
+    if (event.code === "Space") { event.preventDefault(); this.input.release("dash"); return; }
     if (event.code === "ShiftLeft") { event.preventDefault(); this.input.release("sprint"); return; }
     const action = KEY_ACTIONS[event.key];
     if (action) { event.preventDefault(); this.input.release(action); }
@@ -105,6 +111,7 @@ export class PlayerSession {
     this.state = created.state;
     this.regenTimers = createResourceRegenTimers();
     this.sprinting = false;
+    this.dash = createDashState();
     this.previous = created.state.pose;
     this.applyCamera(1);
     return generated;
@@ -133,10 +140,31 @@ export class PlayerSession {
     for (let i = 0; i < result.steps; i++) {
       const command = this.input.sample();
       this.lastSample = Object.freeze({ ...command, movement:Object.freeze({...command.movement}), look:Object.freeze({...command.look}), held:Object.freeze([...command.held]), pressed:Object.freeze([...command.pressed]), released:Object.freeze([...command.released]), edges:Object.freeze(command.edges.map((edge)=>Object.freeze({...edge}))), cancellations:Object.freeze([...command.cancellations]) });
-      let pose = this.state.pose;
+      let pose: PlayerState["pose"] = this.state.pose;
       if (command.look.x !== 0 || command.look.y !== 0) pose = { ...pose, ...applyMouseLook(pose, command.look) };
       this.state = Object.freeze({ ...this.state, pose:Object.freeze(pose) });
       this.previous = this.state.pose;
+      const activation = activateDash(this.dash, this.state.stamina, command.pressed.includes("dash"), this.state.pose.yaw, command.movement);
+      let staminaSpent = activation.accepted;
+      if (activation.accepted) {
+        this.dash = activation.state;
+        this.state = Object.freeze({ ...this.state, stamina:activation.stamina });
+        this.regenTimers = recordStaminaSpend(this.regenTimers);
+      }
+      if (this.dash.active) {
+        const dashStep = advanceDash(this.dash, FIXED_STEP_SECONDS);
+        const moved = moveCircleOnGrid(this.plan!, this.state.pose, dashStep.displacement, this.state.radius);
+        const resolvedDash = resolveDashCollision(dashStep, moved);
+        this.dash = resolvedDash.state;
+        this.sprinting = false;
+        const regenerated = advanceResourceRegeneration(this.state, this.regenTimers, FIXED_STEP_SECONDS, {staminaSpent,active:this.active});
+        this.regenTimers = regenerated.timers;
+        this.state = Object.freeze({...this.state, stamina:regenerated.stamina, mana:regenerated.mana,
+          pose:Object.freeze({...this.state.pose,x:resolvedDash.position.x,z:resolvedDash.position.z}), velocity:resolvedDash.velocity});
+        continue;
+      }
+      // Cooldown is gameplay simulation time and continues after the dash ends.
+      this.dash = advanceDash(this.dash, FIXED_STEP_SECONDS).state;
       const sprint = decideSprint(this.state.stamina, FIXED_STEP_SECONDS, {
         held:command.held.includes("sprint"), active:this.active, axes:command.movement,
         secondaryHeld:command.held.includes("secondary"), healing:false, stanceRestricted:false,
@@ -155,7 +183,7 @@ export class PlayerSession {
       const velocity = Object.freeze({ x:moved.blockedX ? 0 : locomotion.state.velocity.x, y:0, z:moved.blockedZ ? 0 : locomotion.state.velocity.z });
       const committed = commitSprintMovement(locomotion.state, sprintMovementCandidate ? sprint : { eligible:false, maximumSpeed:3.5, staminaCost:0 }, moved.appliedDisplacement);
       this.sprinting = committed.spent;
-      const regenerated = advanceResourceRegeneration(committed.state, this.regenTimers, FIXED_STEP_SECONDS, { staminaSpent:committed.spent, active:this.active });
+      const regenerated = advanceResourceRegeneration(committed.state, this.regenTimers, FIXED_STEP_SECONDS, { staminaSpent:committed.spent || staminaSpent, active:this.active });
       this.regenTimers = regenerated.timers;
       this.state = Object.freeze({ ...committed.state, health:regenerated.health, stamina:regenerated.stamina, mana:regenerated.mana,
         pose:Object.freeze({ ...locomotion.state.pose, x:moved.position.x, z:moved.position.z }), velocity });
@@ -169,7 +197,7 @@ export class PlayerSession {
       radius:this.state?.radius ?? 0.28, cameraHeight:this.state?.cameraHeight ?? 1.6, active:this.active, capture:this.capture.state,
       lastSample:this.lastSample ? Object.freeze({...this.lastSample}) : null,
       resources:this.state ? Object.freeze({ health:Object.freeze({...this.state.health}), stamina:Object.freeze({...this.state.stamina}), mana:Object.freeze({...this.state.mana}) }) : null,
-      regenTimers:Object.freeze({...this.regenTimers}), sprinting:this.sprinting });
+      regenTimers:Object.freeze({...this.regenTimers}), sprinting:this.sprinting, dash:this.dash, evading:this.dash.active && this.dash.evasionRemainingSeconds > 0 });
   }
 
   dispose(): void {
@@ -192,6 +220,7 @@ export class PlayerSession {
   private stopMotion(): void {
     if (!this.state) return;
     this.sprinting = false;
+    this.dash = cancelDash(this.dash);
     this.state = Object.freeze({ ...this.state, velocity:Object.freeze({x:0,y:0,z:0}) });
     this.previous = this.state.pose;
   }

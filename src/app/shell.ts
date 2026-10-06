@@ -100,4 +100,4 @@ export function createAppShell(root: HTMLElement, options: ShellOptions = {}): A
   const help = document.createElement("p");
   help.id = "cryptkeep-help";
   help.className = "cryptkeep__help";
-  help.textContent = "WASD move · Left Shift sprint · Mouse look · Escape release mouse";
+  help.textContent = "WASD move · Left Shift sprint · Space dash · Mouse look · Escape release mouse";
