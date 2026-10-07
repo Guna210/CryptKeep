@@ -1,0 +1,36 @@
+import { expect, test } from "@playwright/test";
+
+test("DEV HUD follows real resources and damage events with bounded caller-time feedback", async ({ page }) => {
+  const pageErrors: string[] = [], consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+  await page.setViewportSize({ width: 960, height: 600 });
+  await page.goto("/tests/harness/hud-fixture.html");
+  await expect(page.locator("#fixture-label")).toHaveText("DEV HUD COMBAT FIXTURE");
+  const hp = page.locator('[data-resource="hp"]'), sta = page.locator('[data-resource="sta"]'), mp = page.locator('[data-resource="mp"]');
+  await expect(hp).toContainText("HP 100 / 100"); await expect(sta).toContainText("STA 75 / 100"); await expect(mp).toContainText("MP 42 / 60");
+  await expect(page.locator(".ck-hud__reticle")).toBeVisible();
+  await page.getByRole("button", { name: "Toggle charge" }).click();
+  await expect(page.locator(".ck-hud__charge")).toBeVisible();
+  await expect(page.locator(".ck-hud__charge i")).toHaveAttribute("style", "width: 50%;");
+  await page.getByRole("button", { name: "Toggle charge" }).click(); await expect(page.locator(".ck-hud__charge")).toBeHidden();
+  await page.getByRole("button", { name: "Low HP" }).click(); await expect(hp).toHaveClass(/is-low/); await expect(hp).toContainText("HP 25 / 100");
+  await page.getByRole("button", { name: "Disable flashes" }).click();
+  await page.getByRole("button", { name: "Incoming damage" }).click();
+  await expect(hp).toContainText("HP 90 / 100"); await expect(hp).not.toHaveClass(/is-low/);
+  await expect(page.locator(".ck-hud__hurt")).toHaveCSS("opacity", "0");
+  await page.getByRole("button", { name: "Enable flashes" }).click(); await page.getByRole("button", { name: "Incoming damage" }).click();
+  await expect(page.locator(".ck-hud__hurt")).toHaveCSS("opacity", "0.22");
+  await page.getByRole("button", { name: "Freeze 1 s" }).click(); await expect(page.locator(".ck-hud__hurt")).toHaveCSS("opacity", "0.22");
+  await page.getByRole("button", { name: "Advance 0.26 s" }).click(); await expect(page.locator(".ck-hud__hurt")).toHaveCSS("opacity", "0");
+  await page.getByRole("button", { name: "Other actors" }).click(); await expect(page.locator(".ck-hud__hit")).not.toHaveClass(/is-visible/);
+  await page.getByRole("button", { name: "Outgoing damage" }).click(); await expect(page.locator(".ck-hud__hit")).toHaveClass(/is-visible/);
+  await page.getByRole("button", { name: "Advance 0.26 s" }).click(); await expect(page.locator(".ck-hud__hit")).not.toHaveClass(/is-visible/);
+  const counts = await page.evaluate(() => { window.hudFixture.updateMany(100); return window.hudFixture.activeSubscriptions(); });
+  expect(counts).toBe(1);
+  await page.screenshot({ path: "test-results/CK-03-08/hud-combat.png" });
+  await page.evaluate(() => window.hudFixture.dispose());
+  expect(await page.evaluate(() => window.hudFixture.activeSubscriptions())).toBe(0);
+  await page.evaluate(() => { window.hudFixture.dispose(); window.hudFixture.emitIncoming(); });
+  expect(pageErrors).toEqual([]); expect(consoleErrors).toEqual([]);
+});
