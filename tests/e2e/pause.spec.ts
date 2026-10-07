@@ -1,10 +1,14 @@
 import { mkdirSync } from "node:fs";
 import { expect, test } from "../harness/browser";
+import type { FloorSessionSnapshot } from "../../src/app/floor-session";
+import type { PlayerSessionSnapshot } from "../../src/app/player-session";
+
+type PauseDiagnosticsApi={snapshot():{floor:Readonly<FloorSessionSnapshot>|null;player:Readonly<PlayerSessionSnapshot>|null}};
 
 test("native pause freezes the session and Resume requires a fresh gesture without replaying held input", async ({page, browserHarness}) => {
   await page.goto("/");
   await expect(page.getByText("DUNGEON PREVIEW")).toBeVisible();
-  const read = () => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot());
+  const read = () => page.evaluate(() => (window.__cryptkeepDiagnostics as unknown as PauseDiagnosticsApi).snapshot());
   await page.getByRole("button", {name:"Explore dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
   await page.keyboard.down("w");
@@ -31,7 +35,10 @@ test("native pause freezes the session and Resume requires a fresh gesture witho
   await page.getByRole("button", {name:"Resume dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
   await expect.poll(async () => (await read()).player!.active).toBe(true);
-  await expect.poll(async () => (await read()).player!.lastSample).not.toBeNull();
+  await expect.poll(async () => {
+    const resumed = await read();
+    return resumed.floor!.tick > paused.floor!.tick && resumed.player!.lastSample !== null;
+  }).toBe(true);
   const firstResumedSample = (await read()).player!.lastSample!;
   expect(firstResumedSample.held).not.toContain("primary");
   expect(firstResumedSample.held).not.toContain("secondary");
@@ -57,7 +64,7 @@ test("native pause freezes the session and Resume requires a fresh gesture witho
 
 test("visibility restoration does not auto-resume; a simulated denial needs a fresh native gesture", async ({page, browserHarness}) => {
   await page.goto("/");
-  const read = () => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!);
+  const read = () => page.evaluate(() => (window.__cryptkeepDiagnostics as unknown as PauseDiagnosticsApi).snapshot().player!);
   await page.getByRole("button", {name:"Explore dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
   await page.evaluate(() => {
@@ -73,12 +80,12 @@ test("visibility restoration does not auto-resume; a simulated denial needs a fr
   expect((await read()).active).toBe(false);
   expect((await read()).capture).toBe("idle");
   await page.locator("canvas").evaluate((element) => {
-    (element as HTMLCanvasElement & {requestPointerLock:() => Promise<void>}).requestPointerLock = () => Promise.reject(new Error("simulated denial"));
+    (element as unknown as {requestPointerLock:() => Promise<void>}).requestPointerLock = () => Promise.reject(new Error("simulated denial"));
   });
   await page.getByRole("button", {name:"Resume dungeon"}).click();
   await expect(page.getByText("Mouse capture was denied. Choose Resume to try again.")).toBeVisible();
   expect((await read()).active).toBe(false);
-  await page.locator("canvas").evaluate((element) => { delete (element as HTMLCanvasElement & {requestPointerLock?:() => Promise<void>}).requestPointerLock; });
+  await page.locator("canvas").evaluate((element) => { delete (element as unknown as {requestPointerLock?:() => Promise<void>}).requestPointerLock; });
   await page.getByRole("button", {name:"Resume dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
   await page.keyboard.press("Escape");
@@ -87,7 +94,7 @@ test("visibility restoration does not auto-resume; a simulated denial needs a fr
 
 test("paused preview controls can reroll a floor without releasing pause or auto-resuming", async ({page, browserHarness}) => {
   await page.goto("/");
-  const snapshot = () => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot());
+  const snapshot = () => page.evaluate(() => (window.__cryptkeepDiagnostics as unknown as PauseDiagnosticsApi).snapshot());
   await expect(page.getByText("DUNGEON PREVIEW")).toBeVisible();
   await page.getByRole("button", {name:"Explore dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
