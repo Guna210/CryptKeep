@@ -24,7 +24,7 @@ test("renders seeded floor-only geometry and replaces/disposes floors repeatedly
   for (const report of repeated) {
     expect(report.rootCount).toBe(1);
     expect(report.counts).toEqual(report.seed === seedA.seed ? seedA.counts : seedB.counts);
-    expect(report.rendererCounts.geometries).toBe(seedB.rendererCounts.geometries);
+    expect(report.rendererCounts.geometries).toBe(report.seed === seedA.seed ? seedA.rendererCounts.geometries : seedB.rendererCounts.geometries);
     expect(report.rendererCounts.textures).toBe(seedB.rendererCounts.textures);
     expect(report.rendererCounts.programs).toBe(seedB.rendererCounts.programs);
   }

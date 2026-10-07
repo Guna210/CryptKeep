@@ -92,9 +92,9 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
       });
       mortar.instanceMatrix.needsUpdate=true; mortar.computeBoundingSphere(); root.add(mortar); meshes.push(mortar);
     }
-    // The 0.90m rounded face plus a narrow three-segment 0.035m bevel gives a fixed 0.97m footprint.
+    // Keep the 0.90m rounded face and narrow 0.035m bevel while using a compact indexed silhouette.
     // Two stones occupy each 2m module: 0.03m mortar remains within and across tile boundaries.
-    const stoneSurface = new ExtrudeGeometry(blockShape, { depth: 0.10, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.035, bevelThickness: 0.045, curveSegments: 3 });
+    const stoneSurface = new ExtrudeGeometry(blockShape, { depth: 0.10, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.035, bevelThickness: 0.045, curveSegments: 2 });
     stoneSurface.translate(0, 0, -0.05);
     stoneSurface.computeBoundingBox();
     const stoneBounds=stoneSurface.boundingBox!;

@@ -7,6 +7,7 @@ import { createMinimalPauseUI } from "./ui/pause-minimal";
 import { createRenderedFloor, createRenderedGrid } from "./render/floor";
 import { createMaterialLibrary } from "./render/materials";
 import { createWorldRenderer } from "./render/renderer";
+import { createRenderScheduler } from "./render/render-scheduler";
 import { installDiagnostics, type AppReadiness } from "./debug";
 import { createSwordViewmodel, type ViewmodelController } from "./render/viewmodel";
 import { createCombatHud, type CombatHud } from "./ui/hud";
@@ -31,6 +32,7 @@ const trainingButtonCleanups:Array<()=>void>=[];
 let worldRequest=0;
 let raf = 0;
 let stopped = false;
+const renderScheduler=createRenderScheduler();
 let form: HTMLFormElement | null = null;
 let formSubmitListener: ((event: SubmitEvent) => void) | null = null;
 const pauseUI = createMinimalPauseUI(shell.overlay, onResume);
@@ -60,7 +62,13 @@ function frame(timestamp: number): void {
   if(result) hud?.advance(result.steps/60,!playerState?.active);
   if(combatState?.actors[0]) targetView?.update(combatState.actors[0].health.current,combatState.actors[0].health.maximum);
   if(combatState) swordModel?.update(combatState.sword);
-  if (world && !document.hidden) world.renderer.render(world.scene, world.camera);
+  if (world) {
+    const camera=world.camera;
+    const signature=[camera.position.x,camera.position.y,camera.position.z,camera.rotation.x,camera.rotation.y,camera.rotation.z,
+      combatState ? JSON.stringify(combatState.sword) : ""].join(":");
+    const viewport=`${world.renderer.domElement.width}x${world.renderer.domElement.height}@${window.devicePixelRatio||1}`;
+    if(renderScheduler.shouldRender(!!playerState?.active,signature,viewport,!document.hidden)) world.renderer.render(world.scene,camera);
+  }
   raf = requestAnimationFrame(frame);
 }
 function pause(reason: "blur" | "hidden" | "pause"): void { player?.release(reason); }
@@ -92,7 +100,7 @@ function teardown(): void {
   cleanup(() => window.removeEventListener("pagehide", teardown));
   cleanup(() => shell.dispose());
 }
-function onVisibility(): void { if (document.hidden) pause("hidden"); }
+function onVisibility(): void { if (document.hidden) pause("hidden"); else renderScheduler.invalidate(); }
 function onBlur(): void { pause("blur"); }
 function setCombatWorld(grid:Grid,actors:readonly CombatActor[]=[]):void {
   if(!world||!player)return;
@@ -105,6 +113,7 @@ function setCombatWorld(grid:Grid,actors:readonly CombatActor[]=[]):void {
     hud=createCombatHud(appRoot,playerId,combat.events);
     swordModel=createSwordViewmodel(activeWorld);
   }
+  renderScheduler.invalidate();
   hud?.resetFeedback();
 }
 async function showTraining(variant:"clear"|"obstructed"):Promise<void> {

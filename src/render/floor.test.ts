@@ -66,8 +66,8 @@ describe("rendered floor ownership and placement", () => {
     expect(shader.vertexShader).toContain("vMapUv = vMapUv * 0.5 + atlasOffset;");
     expect(masonry[0].material.customProgramCacheKey()).toContain("stone-atlas-instanced");
     expect(masonry[0].geometry.index).not.toBeNull();
-    expect(masonry[0].geometry.attributes.position.count).toBe(224);
-    expect(masonry[0].geometry.index.count/3).toBe(444);
+    expect(masonry[0].geometry.attributes.position.count).toBe(80);
+    expect(masonry[0].geometry.index.count/3).toBe(156);
     expect(masonry[0].geometry.attributes.normal.count).toBe(masonry[0].geometry.attributes.position.count);
     for(let i=0;i<masonry[0].geometry.attributes.normal.count;i++){
       const normal=masonry[0].geometry.attributes.normal;
