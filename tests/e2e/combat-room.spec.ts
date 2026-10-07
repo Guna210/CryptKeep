@@ -7,9 +7,14 @@ test("DEV training room renders a real target, damage/death state, and optional 
   await page.setViewportSize({ width: 960, height: 600 });
   await page.goto("/tests/harness/combat-room.html");
   await expect(page.locator("#label")).toContainText("DEV TRAINING ROOM · HP 100 / 100 · ALIVE");
-  const initial = await page.evaluate(() => ({ draws: window.combatRoomFixture.drawCalls(), hits: window.combatRoomFixture.queryTargets().map((hit) => hit.targetId), globals: Object.keys(window).filter((key) => /combatRoom|cryptkeep/i.test(key)) }));
+  const initial = await page.evaluate(() => {
+    const state = window.combatRoomFixture.snapshot();
+    const collider = state.aliveColliders[0];
+    return { draws: window.combatRoomFixture.drawCalls(), hits: window.combatRoomFixture.queryTargets().map((hit) => hit.targetId), globals: Object.keys(window).filter((key) => /combatRoom|cryptkeep/i.test(key)), colliderPosition: collider?.position ?? null, renderedPosition: window.combatRoomFixture.renderedTargetPosition() };
+  });
   expect(initial.draws).toBeGreaterThan(0); expect(initial.hits).toEqual(["dev-training-dummy"]);
   expect(initial.globals).toContain("combatRoomFixture");
+  expect(initial.renderedPosition).toEqual(initial.colliderPosition);
   await page.screenshot({ path: "test-results/CK-03-07/training-clear.png" });
   await page.getByRole("button", { name: "Toggle obstruction" }).click();
   await expect(page.locator("#variant")).toHaveText("OBSTRUCTED");

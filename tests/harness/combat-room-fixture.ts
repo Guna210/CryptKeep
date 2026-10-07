@@ -1,9 +1,9 @@
 import { AmbientLight, BoxGeometry, DirectionalLight, Mesh, MeshStandardMaterial, PerspectiveCamera, Scene, WebGLRenderer } from "three";
-import { createCombatRoomFixture, TRAINING_PLAYER, TRAINING_TARGET_ID } from "../../src/debug/fixtures/combat-room";
+import { createCombatRoomFixture, TRAINING_PLAYER, TRAINING_TARGET_ID, TRAINING_TARGET_POSITION } from "../../src/debug/fixtures/combat-room";
 import { createTrainingTargetView, type TrainingTargetView } from "../../src/render/training-target";
 import type { CombatRoomFixture } from "../../src/debug/fixtures/combat-room";
 
-declare global { interface Window { combatRoomFixture: { snapshot: () => ReturnType<CombatRoomFixture["snapshot"]>; queryTargets: () => ReturnType<CombatRoomFixture["queryTargets"]>; apply: (attackId: string, amount: number) => void; toggleWall: () => void; drawCalls: () => number; dispose: () => void; }; } }
+declare global { interface Window { combatRoomFixture: { snapshot: () => ReturnType<CombatRoomFixture["snapshot"]>; queryTargets: () => ReturnType<CombatRoomFixture["queryTargets"]>; renderedTargetPosition: () => { x: number; z: number } | null; apply: (attackId: string, amount: number) => void; toggleWall: () => void; drawCalls: () => number; dispose: () => void; }; } }
 const host = document.querySelector<HTMLElement>("#fixture")!;
 const label = document.querySelector<HTMLOutputElement>("#label")!;
 const variant = document.querySelector<HTMLOutputElement>("#variant")!;
@@ -28,8 +28,8 @@ function build(): void {
     const mesh = new Mesh(solid ? wallGeometry : floorGeometry, solid ? wallMaterial : floorMaterial);
     mesh.position.set(x * 2 + 1, solid ? 1.5 : -0.06, z * 2 + 1); scene.add(mesh); roomObjects.push(mesh);
   }
-  targetView = createTrainingTargetView(snapshot.target); targetView.root.position.set(9, 0, 9.9); scene.add(targetView.root);
-  camera.position.set(snapshot.player.x, 1.6, snapshot.player.z); camera.lookAt(9, 1, 9.9); camera.updateProjectionMatrix();
+  targetView = createTrainingTargetView(snapshot.target); targetView.root.position.set(TRAINING_TARGET_POSITION.x, 0, TRAINING_TARGET_POSITION.z); scene.add(targetView.root);
+  camera.position.set(snapshot.player.x, 1.6, snapshot.player.z); camera.lookAt(TRAINING_TARGET_POSITION.x, 1, TRAINING_TARGET_POSITION.z); camera.updateProjectionMatrix();
   variant.textContent = snapshot.variant.toUpperCase();
   updateLabel(); renderer.render(scene, camera);
 }
@@ -44,5 +44,5 @@ document.querySelector("#light")!.addEventListener("click", () => apply(`light-$
 document.querySelector("#heavy")!.addEventListener("click", () => apply(`heavy-${serial++}`, 54));
 document.querySelector("#finish")!.addEventListener("click", () => apply(`finish-${serial++}`, 100));
 document.querySelector("#wall")!.addEventListener("click", () => { room.dispose(); room = createCombatRoomFixture({ obstructed: variant.textContent !== "OBSTRUCTED" }); build(); });
-window.combatRoomFixture = { snapshot: () => room.snapshot(), queryTargets: () => room.queryTargets(), apply, toggleWall: () => document.querySelector<HTMLButtonElement>("#wall")!.click(), drawCalls: () => renderer.info.render.calls, dispose() { room.dispose(); targetView?.dispose(); for (const object of roomObjects) scene.remove(object); renderer.dispose(); floorGeometry.dispose(); wallGeometry.dispose(); floorMaterial.dispose(); wallMaterial.dispose(); host.replaceChildren(); } };
+window.combatRoomFixture = { snapshot: () => room.snapshot(), queryTargets: () => room.queryTargets(), renderedTargetPosition: () => targetView ? { x: targetView.root.position.x, z: targetView.root.position.z } : null, apply, toggleWall: () => document.querySelector<HTMLButtonElement>("#wall")!.click(), drawCalls: () => renderer.info.render.calls, dispose() { room.dispose(); targetView?.dispose(); for (const object of roomObjects) scene.remove(object); renderer.dispose(); floorGeometry.dispose(); wallGeometry.dispose(); floorMaterial.dispose(); wallMaterial.dispose(); host.replaceChildren(); } };
 build();
