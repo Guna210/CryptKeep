@@ -1,6 +1,6 @@
 # CK-ART-02 — painted cartoon refinement
 
-Owner rejected CK-ART-01's visual direction as low quality/low-poly: too many hard edges, uneven stone spacing and a triangle instead of a torch. They authorize continuing on `cartoon-art-preview` and explicitly prohibit editing master. This is a new owner-directed refinement task, not a reset of CK-ART-01's completed review rounds. Main plans/coordinatess; Luna builds and separately reviews under REVIEW.md (maximum3 rounds for this task).
+Owner rejected CK-ART-01's visual direction as low quality/low-poly: too many hard edges, uneven stone spacing and a triangle instead of a torch. They authorize continuing on `cartoon-art-preview` and explicitly prohibit editing master. This is a new owner-directed refinement task, not a reset of CK-ART-01's completed review rounds. Main plans/coordinates; Luna builds and separately reviews under REVIEW.md (maximum3 rounds for this task).
 
 ## Art direction and acceptance
 

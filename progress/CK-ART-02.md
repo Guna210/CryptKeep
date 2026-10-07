@@ -76,3 +76,11 @@ Orchestrator validation: full 171 application tests and 7 verification-tool case
 ## Round 2 performance repair
 
 Round 2 reduces the shared rounded-stone geometry to 224 indexed vertices / 444 triangles per stone and spatially batches stones in 8m chunks for frustum culling. The `floor-render-contract` fixture contains 1,716 stones in 57 chunks (dimension-derived upper bound 64). A local pure module 25-cycle measurement took 838ms total (316ms generation, 471ms construction, 3ms disposal); this does not diagnose the prior hosted browser failures or establish an FPS result. Typecheck, 173 app tests plus tooling verification, production build, and diff check pass. Hosted 25-case verification and exact-snapshot screenshots remain pending; local E2E was not run due loopback restrictions. Full round-2 details: `progress/CK-ART-02.round-2-fix.md`; exact source hashes: `/tmp/cryptkeep-art02-repaired-r2.json`.
+
+## Round 3 lifecycle budget repair
+
+The 25-reroll lifecycle test has a scoped 60-second timeout with 5-second fill/click/poll bounds on every reroll and per-cycle test-step labels. All 25 rerolls, invalid-input recovery, lifecycle/readiness, listener/scene teardown and no-error assertions remain. Typecheck, 173 application tests plus tooling verification, production build, and diff check pass. Hosted verification of this exact source remains pending; local browser E2E was not run due loopback restrictions. Full details: `progress/CK-ART-02.round-3-fix.md`; exact source hashes: `/tmp/cryptkeep-art02-repaired-r3.json`.
+
+## Final published outcome — unaccepted
+
+Three requested review/repair rounds have been used. Final source-only candidate `5b9db697d165e630908d1a199ba6cb6b38e875cf` passed hosted typecheck,173app/tool/build and23/25 browser checks in run37649648943. Actual final production PNGs were inspected: rounded masonry, consistent seams and recognizable layered torch remain improved. The proposed scoped timeout did not take effect (logs still30000ms); lifecycle reroll16/25 fails, and wall-movement stamina regeneration poll also fails. No further automatic repair; see final independent verification. Closing metadata changes do not imply newer CI passed. Master unchanged, no merge.

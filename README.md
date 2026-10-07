@@ -1,4 +1,4 @@
-> This branch is the owner-requested **cartoon art preview**, currently being refined with rounded painted masonry and recognizable warm torches. Open the Cloudflare branch preview and choose **Explore dungeon**; no debug command is needed. CK-ART-02 review is in progress; this branch has not been merged or adopted as the final art direction. See [refinement task](decisions/cartoon-art-refinement.md).
+> This branch is the owner-requested **cartoon art preview** with rounded painted masonry, consistent joints, recognizable warm torches and a softer sword. Open the Cloudflare branch preview and choose **Explore dungeon**; no debug command is needed. Visual review passed, but CK-ART-02 remains unaccepted after three rounds: the final hosted suite passed 23/25 browser checks. This branch has not been merged or adopted as the final art direction. See [refinement task](decisions/cartoon-art-refinement.md) and [final review](reviews/CK-ART-02/round-3-verification.md).
 
 # CryptKeep
 
