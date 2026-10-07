@@ -26,10 +26,15 @@ test("Three.js renders the fixture and releases renderer observers across repeat
   expect(initial.native.validTextures).toBe(initial.native.createdTextures);
   expect(initial.native.liveContexts).toBe(1);
   expect(initial.canvas.width / initial.canvas.height).toBeCloseTo(960 / 600, 2);
+  expect(initial.canvas.width).toBeGreaterThanOrEqual(960);
+  expect(initial.canvas.width * initial.canvas.height).toBeLessThanOrEqual(2_400_000);
   await page.screenshot({ path: "test-results/CK-00-03/renderer-fixture.png" });
 
   await page.setViewportSize({ width: 720, height: 480 });
-  await expect.poll(() => page.locator("canvas").evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height])).toEqual([405, 270]);
+  await expect.poll(() => page.locator("canvas").evaluate((canvas: HTMLCanvasElement) => canvas.width / canvas.height)).toBeCloseTo(720 / 480, 2);
+  const resizedBuffer = await page.locator("canvas").evaluate((canvas: HTMLCanvasElement) => ({width:canvas.width,height:canvas.height}));
+  expect(resizedBuffer.width).toBeGreaterThanOrEqual(720);
+  expect(resizedBuffer.width * resizedBuffer.height).toBeLessThanOrEqual(2_400_000);
   const resizedAspect = await page.evaluate(() => window.rendererFixture.active!.camera.aspect);
   expect(resizedAspect).toBeCloseTo(720 / 480, 5);
 

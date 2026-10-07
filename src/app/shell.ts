@@ -69,7 +69,7 @@ export function createAppShell(root: HTMLElement, options: ShellOptions = {}): A
   overlay.append(panel);
   root.replaceChildren(canvas, overlay);
 
-  const getContext = options.getWebGL2Context ?? ((element) => element.getContext("webgl2"));
+  const getContext = options.getWebGL2Context ?? ((element) => element.getContext("webgl2", { antialias: true, alpha: false, powerPreference: "high-performance" }));
   const context = getContext(canvas);
   if (!context) {
     statusLabel.textContent = "RENDERING UNAVAILABLE";

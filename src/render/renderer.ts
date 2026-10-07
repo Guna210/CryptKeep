@@ -1,5 +1,7 @@
 import {
+  ACESFilmicToneMapping,
   BoxGeometry,
+  AmbientLight,
   Color,
   ConeGeometry,
   DirectionalLight,
@@ -40,8 +42,8 @@ export interface WorldRendererOptions {
   includeDiagnosticFixture?: boolean;
 }
 
-const LOGICAL_WIDTH = 480;
-const LOGICAL_HEIGHT = 270;
+const MAX_BUFFER_PIXELS = 2_400_000;
+const MAX_DEVICE_RATIO = 1.5;
 
 function createDiagnosticFixture(scene: Scene): { root: Group; geometries: Set<BoxGeometry | ConeGeometry | PlaneGeometry>; materials: Set<MeshStandardMaterial> } {
   const root = new Group();
@@ -73,22 +75,29 @@ function createDiagnosticFixture(scene: Scene): { root: Group; geometries: Set<B
   return { root, geometries, materials };
 }
 
-/** Creates a low-resolution Three.js world renderer on the shell's existing canvas/context. */
+/** Creates a smooth, viewport-aware Three.js world renderer on the shell's canvas/context. */
 export function createWorldRenderer(canvas: HTMLCanvasElement, options: WorldRendererOptions): WorldRenderer {
   const { context, resizeTarget } = options;
-  const renderer = new WebGLRenderer({ canvas, context, antialias: false, alpha: false, powerPreference: "high-performance" });
-  renderer.setPixelRatio(1);
+  const renderer = new WebGLRenderer({ canvas, context, antialias: true, alpha: false, powerPreference: "high-performance" });
+  const deviceRatio = Math.min(MAX_DEVICE_RATIO, window.devicePixelRatio || 1);
+  renderer.setPixelRatio(deviceRatio);
+  renderer.outputColorSpace = "srgb";
+  renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
   renderer.setClearColor(new Color(0x11151a), 1);
   renderer.outputColorSpace = "srgb";
   renderer.info.autoReset = true;
 
   const scene = new Scene();
-  scene.background = new Color(0x11151a);
+  scene.background = new Color(0x142126);
   const camera = new PerspectiveCamera(options.fov ?? 70, 16 / 9, 0.1, 100);
   camera.position.set(0, 3.1, 9.5);
   camera.lookAt(0, 0.6, -1.1);
-  scene.add(new DirectionalLight(0xffd39b, 2.2));
-  const fill = new DirectionalLight(0x7e91b8, 0.8);
+  scene.add(new AmbientLight(0x94b4b2, 1.35));
+  const key = new DirectionalLight(0xffd4a0, 2.0);
+  key.position.set(-4, 8, 5);
+  scene.add(key);
+  const fill = new DirectionalLight(0x6d969b, 1.0);
   fill.position.set(-3, 4, 5);
   scene.add(fill);
   const fixture = options.includeDiagnosticFixture === false ? null : createDiagnosticFixture(scene);
@@ -100,11 +109,9 @@ export function createWorldRenderer(canvas: HTMLCanvasElement, options: WorldRen
     const height = Math.max(1, resizeTarget.clientHeight);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    // Keep a low-resolution buffer while following the viewport's shape.
-    const scale = Math.min(LOGICAL_WIDTH / width, LOGICAL_HEIGHT / height);
-    const bufferWidth = Math.max(1, Math.round(width * scale));
-    const bufferHeight = Math.max(1, Math.round(height * scale));
-    renderer.setSize(bufferWidth, bufferHeight, false);
+    const ratio = Math.min(deviceRatio, Math.sqrt(MAX_BUFFER_PIXELS / (width * height)));
+    renderer.setPixelRatio(ratio);
+    renderer.setSize(width, height, false);
     renderer.render(scene, camera);
   };
   const observer = new ResizeObserver(resize);

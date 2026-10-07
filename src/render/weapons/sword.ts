@@ -1,6 +1,6 @@
 import {
-  BoxGeometry, BufferGeometry, DataTexture, Euler, Group, Mesh, MeshStandardMaterial,
-  NearestFilter, Quaternion, RGBAFormat, Shape, ShapeGeometry, SRGBColorSpace, Vector3,
+  BoxGeometry, BufferGeometry, Euler, ExtrudeGeometry, Group, Mesh, MeshStandardMaterial,
+  Quaternion, Shape, Vector3,
 } from "three";
 import type { WorldRenderer } from "../renderer";
 import type { SwordState } from "../../weapons/sword";
@@ -61,11 +61,10 @@ export function getSwordPose(state: SwordState): SwordPose {
 export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camera">): SwordViewmodel {
   const root = new Group();
   root.name = "sword-viewmodel";
-  const texture = makeSwordTexture();
-  const bladeMaterial = new MeshStandardMaterial({ map: texture, roughness: 0.42, metalness: 0.58, emissive: 0x000000 });
-  const leatherMaterial = new MeshStandardMaterial({ map: texture, roughness: 0.95, metalness: 0 });
-  const goldMaterial = new MeshStandardMaterial({ map: texture, roughness: 0.65, metalness: 0.52 });
-  const glowMaterial = new MeshStandardMaterial({ map: texture, roughness: 0.45, metalness: 0.1, emissive: 0x000000 });
+  const bladeMaterial = new MeshStandardMaterial({ color: 0xa9c7c8, roughness: 0.3, metalness: 0.78, emissive: 0x000000 });
+  const leatherMaterial = new MeshStandardMaterial({ color: 0x30231d, roughness: 0.92, metalness: 0 });
+  const goldMaterial = new MeshStandardMaterial({ color: 0xc9924e, roughness: 0.38, metalness: 0.7 });
+  const glowMaterial = new MeshStandardMaterial({ color: 0xffc56c, roughness: 0.4, metalness: 0.18, emissive: 0x000000 });
   const geometries: BufferGeometry[] = [];
   const materials = [bladeMaterial, leatherMaterial, goldMaterial, glowMaterial];
   const mesh = (geometry: BufferGeometry, material: MeshStandardMaterial, name: string) => {
@@ -78,7 +77,9 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
   const bladeShape = new Shape();
   bladeShape.moveTo(-0.055, 0.02); bladeShape.lineTo(0.055, 0.02); bladeShape.lineTo(0.052, 0.56);
   bladeShape.lineTo(0, 0.73); bladeShape.lineTo(-0.052, 0.56); bladeShape.closePath();
-  const blade = mesh(new ShapeGeometry(bladeShape), bladeMaterial, "pixel-steel-blade");
+  const bladeGeometry = new ExtrudeGeometry(bladeShape, { depth: 0.075, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.018, bevelThickness: 0.018, curveSegments: 1 });
+  bladeGeometry.translate(0, 0, -0.0375);
+  const blade = mesh(bladeGeometry, bladeMaterial, "faceted-steel-blade");
   blade.position.z = 0.01;
   mesh(new BoxGeometry(0.31, 0.055, 0.075), goldMaterial, "crossguard").position.y = -0.015;
   mesh(new BoxGeometry(0.085, 0.31, 0.085), leatherMaterial, "wrapped-grip").position.y = -0.19;
@@ -129,34 +130,6 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
       root.clear();
       for (const geometry of geometries) geometry.dispose();
       for (const material of materials) material.dispose();
-      texture.dispose();
     },
   };
-}
-
-function makeSwordTexture(): DataTexture {
-  const width = 16, height = 16;
-  // Four deliberately blocky bands provide steel, leather, brass and rune pixels on one nearest-sampled atlas.
-  const palette = [
-    [34, 47, 58, 255], [82, 108, 119, 255], [161, 180, 181, 255], [215, 223, 210, 255],
-    [48, 29, 23, 255], [101, 55, 33, 255], [163, 105, 57, 255], [229, 184, 103, 255],
-    [13, 42, 58, 255], [23, 103, 133, 255], [39, 195, 206, 255], [186, 250, 231, 255],
-    [0, 0, 0, 255], [255, 255, 255, 255], [69, 69, 69, 255], [120, 132, 134, 255],
-  ];
-  const data = new Uint8Array(width * height * 4);
-  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-    let p = 0;
-    if (y < 8) p = (x % 7 === 0 || y === 2) ? 3 : ((x + y) % 4 === 0 ? 2 : 1);
-    else if (y < 11) p = x % 4 < 2 ? 7 : 6;
-    else if (y < 15) p = (x + y) % 5 < 2 ? 5 : 4;
-    else p = x % 4 < 2 ? 7 : 6;
-    if (x === 12 && y > 2 && y < 8) p = 10;
-    data.set(palette[p]!, (y * width + x) * 4);
-  }
-  const result = new DataTexture(data, width, height, RGBAFormat);
-  result.magFilter = NearestFilter;
-  result.minFilter = NearestFilter;
-  result.colorSpace = SRGBColorSpace;
-  result.needsUpdate = true;
-  return result;
 }

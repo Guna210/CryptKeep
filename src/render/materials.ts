@@ -1,5 +1,5 @@
 import {
-  MeshBasicMaterial, MeshStandardMaterial, NearestFilter, RepeatWrapping,
+  MeshBasicMaterial, MeshStandardMaterial, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping,
   SRGBColorSpace, Texture, UnsignedByteType, RGBAFormat, DataTexture,
 } from "three";
 import { BASE_TILE_KINDS, createBaseTile, type BaseTileKind } from "./textures/base";
@@ -14,15 +14,15 @@ export interface MaterialLibrary {
 }
 
 /** Owns one texture and one material per recipe. Meshes may borrow material instances until disposal. */
-export function createMaterialLibrary(seed: string, size = 32): MaterialLibrary {
+export function createMaterialLibrary(seed: string, size = 64): MaterialLibrary {
   const textures = {} as Record<BaseTileKind, DataTexture>;
   const materials = {} as Record<BaseTileKind, BaseMaterial>;
   for (const kind of BASE_TILE_KINDS) {
     const recipe = createBaseTile(seed, kind, size);
     const texture = new DataTexture(recipe.data, recipe.width, recipe.height, RGBAFormat, UnsignedByteType);
-    texture.magFilter = NearestFilter;
-    texture.minFilter = NearestFilter;
-    texture.generateMipmaps = false;
+    texture.magFilter = LinearFilter;
+    texture.minFilter = LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
     texture.colorSpace = SRGBColorSpace;
     texture.wrapS = kind === "stone" || kind === "floor" || kind === "door" ? RepeatWrapping : texture.wrapS;
     texture.wrapT = kind === "stone" || kind === "floor" || kind === "door" ? RepeatWrapping : texture.wrapT;

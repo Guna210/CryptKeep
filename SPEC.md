@@ -1,3 +1,5 @@
+> Branch experiment (2026-10-07): CK-ART-01 authorizes cartoon presentation on `cartoon-art-preview` only. [decisions/cartoon-art-preview.md](decisions/cartoon-art-preview.md) supplies the scope and overrides low-resolution/pixel-specific presentation requirements for this experiment. The 196 campaign task IDs and gameplay requirements remain unchanged; merging/permanent adoption awaits the owner’s preview feedback.
+
 # CryptKeep — Technical Specification and Task Plan
 
 Version: 1.0 · Written: 2026-10-06 · Live implementation status and evidence: [CONTEXT.md](CONTEXT.md) and per-task handoffs.

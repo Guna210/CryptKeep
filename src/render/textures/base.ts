@@ -5,9 +5,9 @@ export type BaseTileKind = (typeof BASE_TILE_KINDS)[number];
 export interface BaseTileRecipe { readonly kind: BaseTileKind; readonly width: number; readonly height: number; readonly data: Uint8Array; }
 type RGB = readonly [number, number, number];
 const palettes: Record<BaseTileKind, readonly RGB[]> = {
-  stone: [[48,53,58],[67,72,75],[89,91,88],[118,113,99],[34,39,43]],
-  floor: [[73,79,75],[91,96,87],[111,110,94],[57,64,62],[132,125,103]],
-  door: [[69,43,31],[100,62,39],[132,81,47],[47,54,59],[169,121,66]],
+  stone: [[37,57,62],[53,76,81],[75,100,102],[102,125,121],[25,41,46]],
+  floor: [[56,75,73],[72,91,87],[89,105,99],[38,55,56],[108,119,106]],
+  door: [[56,40,31],[91,61,42],[127,83,52],[39,54,58],[167,116,67]],
   entry: [[15,42,53],[15,113,139],[25,202,215],[172,253,246]],
   boss: [[57,23,30],[132,36,43],[203,58,46],[255,153,65]],
   reward: [[22,55,40],[44,132,79],[96,210,103],[211,255,154]],
@@ -19,7 +19,7 @@ export function createBaseTile(seed: string, kind: BaseTileKind, size = 32): Bas
   if (!BASE_TILE_KINDS.includes(kind)) throw new RangeError(`Unsupported base tile kind: ${String(kind)}`);
   if (typeof seed !== "string") throw new TypeError("Tile seed must be a string");
   const normalized = normalizeSeed(seed);
-  if (!Number.isInteger(size) || (size !== 16 && size !== 32)) throw new RangeError("Tile size must be 16 or 32 pixels");
+  if (!Number.isInteger(size) || ![16,32,64].includes(size)) throw new RangeError("Tile size must be 16, 32 or 64 pixels");
   const rng = deriveStream(normalized, "cosmetics", `base/${kind}/${size}`);
   const colors = palettes[kind];
   const colorAt = (index: number): RGB => colors[index]!;
@@ -36,12 +36,19 @@ export function createBaseTile(seed: string, kind: BaseTileKind, size = 32): Bas
     if (kind === "stone") {
       const row = Math.floor(y / (size / 4));
       const offset = row % 2 ? size / 4 : 0;
-      const seam = y % (size / 4) === 0 || (x + offset) % (size / 2) === 0;
-      c = seam ? colorAt(4) : (rng.nextInt(0, 7) === 0 ? colorAt(2 + rng.nextInt(0, 2)) : colorAt(1));
-      if (!seam && y % (size / 4) === 1 && x % (size / 2) === 2) c = colorAt(3);
+      const localY = y % (size / 4), localX = (x + offset) % (size / 2);
+      const seam = localY < 2 || localX < 2;
+      const band = Math.floor(localY / Math.max(1, size / 16));
+      c = seam ? colorAt(4) : colorAt(band === 0 ? 3 : band >= 3 ? 0 : 1);
+      if (!seam && localX > size / 2 - 4) c = colorAt(0);
+      // Sparse broad chips keep each block readable instead of covering it in pixel noise.
+      if (!seam && rng.nextInt(0, 96) === 0) c = colorAt(2);
     } else if (kind === "floor") {
-      const gap = x % (size / 2) === 0 || y % (size / 2) === 0 || (x < size / 2 && y < size / 2 && x + y < 2);
-      c = gap ? colorAt(3) : (rng.nextInt(0, 6) === 0 ? colorAt(4) : colorAt(1 + rng.nextInt(0, 2)));
+      const localX=x%(size/2),localY=y%(size/2);
+      const gap = localX < 2 || localY < 2;
+      const slab = (Math.floor(x/(size/2))+Math.floor(y/(size/2)))%3;
+      c = gap ? colorAt(3) : colorAt(slab===0?1:slab===1?2:0);
+      if (!gap && localX < 5 && localY < 5) c=colorAt(4);
     } else if (kind === "door") {
       const frame = x < 3 || x >= size - 3 || y < 2 || y >= size - 2;
       const ironBand = y === size / 4 || y === size / 2 || y === size * 3 / 4;

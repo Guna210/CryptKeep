@@ -9,7 +9,9 @@ test("sword renders readable tap and charged poses and disposes its owned model"
   await page.goto("/tests/harness/viewmodel.html");
   await expect(page.locator("#state")).toHaveText("fixture ready");
   const canvasSize = await page.locator("canvas").evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height]);
-  expect(canvasSize).toEqual([480, 270]);
+  expect(canvasSize[0]).toBeGreaterThanOrEqual(960);
+  expect(canvasSize[1]).toBeGreaterThanOrEqual(540);
+  expect(canvasSize[0] * canvasSize[1]).toBeLessThanOrEqual(2_400_000);
   const initialDrawCalls = await page.evaluate(() => window.swordFixture.renderer.getResourceCounts().drawCalls);
   expect(initialDrawCalls).toBeGreaterThan(0);
   await page.evaluate(() => {

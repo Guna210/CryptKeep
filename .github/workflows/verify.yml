@@ -2,7 +2,7 @@ name: Verify
 
 on:
   push:
-    branches: [master, codex/cryptkeep-m03-review]
+    branches: [master, codex/cryptkeep-m03-review, cartoon-art-preview]
   pull_request:
   workflow_dispatch:
 
@@ -53,6 +53,15 @@ jobs:
         with:
           name: cryptkeep-m03-${{ github.run_id }}-${{ github.run_attempt }}
           path: test-results/CK-03-*/**
+          if-no-files-found: ignore
+          retention-days: 7
+          compression-level: 6
+      - name: Upload CK-ART-01 production style evidence
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/cartoon-art-preview'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryptkeep-cartoon-art-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/CK-ART-01/**
           if-no-files-found: ignore
           retention-days: 7
           compression-level: 6

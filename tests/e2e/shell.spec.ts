@@ -29,8 +29,9 @@ test("application shell renders, resizes, and reports ready diagnostics", async 
   }));
   expect(firstSize.rect.width).toBe(960);
   expect(firstSize.rect.height).toBe(600);
-  expect(firstSize.width).toBeLessThan(firstSize.rect.width);
-  expect(firstSize.height).toBeLessThan(firstSize.rect.height);
+  expect(firstSize.width).toBeGreaterThanOrEqual(firstSize.rect.width);
+  expect(firstSize.height).toBeGreaterThanOrEqual(firstSize.rect.height);
+  expect(firstSize.width * firstSize.height).toBeLessThanOrEqual(2_400_000);
   expect(firstSize.width / firstSize.height).toBeCloseTo(firstSize.rect.width / firstSize.rect.height, 2);
 
   mkdirSync("test-results/CK-00-08", { recursive: true });
@@ -39,7 +40,11 @@ test("application shell renders, resizes, and reports ready diagnostics", async 
   await expect.poll(() => page.locator("canvas").evaluate((canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
     return [rect.width, rect.height, canvas.width, canvas.height];
-  })).toEqual([720, 480, 405, 270]);
+  })).toEqual([720, 480, expect.any(Number), expect.any(Number)]);
+  const resized = await page.locator("canvas").evaluate((canvas:HTMLCanvasElement)=>({width:canvas.width,height:canvas.height}));
+  expect(resized.width).toBeGreaterThanOrEqual(720);
+  expect(resized.height).toBeGreaterThanOrEqual(480);
+  expect(resized.width*resized.height).toBeLessThanOrEqual(2_400_000);
 
   await page.evaluate(() => { window.dispatchEvent(new Event("pagehide")); window.dispatchEvent(new Event("pagehide")); });
   expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);

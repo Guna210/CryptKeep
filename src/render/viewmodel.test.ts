@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { Group, Mesh, PerspectiveCamera, Scene } from "three";
+import { Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Scene } from "three";
 import { createSwordState, cancelSword, type SwordState } from "../weapons/sword";
 import type { WorldRenderer } from "./renderer";
 import { createSwordViewmodel } from "./viewmodel";
@@ -54,8 +54,6 @@ describe("sword viewmodel", () => {
       material.addEventListener("dispose", materialDispose);
       return { geometryDispose, materialDispose };
     });
-    const texture = ((owned[0] as any).material.map);
-    const textureDispose = vi.fn(); texture.addEventListener("dispose", textureDispose);
     model.detach();
     expect(camera.children).toEqual([sibling]);
     expect(scene.children).not.toContain(model.root);
@@ -66,7 +64,10 @@ describe("sword viewmodel", () => {
     expect(scene.children).not.toContain(model.root);
     expect(camera.parent).toBeNull();
     expect(disposals.every((entry) => entry.geometryDispose.mock.calls.length === 1 && entry.materialDispose.mock.calls.length === 1)).toBe(true);
-    expect(textureDispose).toHaveBeenCalledTimes(1);
+    expect(owned.every((part)=>{
+      const material=(part as Mesh).material as MeshStandardMaterial;
+      return material instanceof MeshStandardMaterial && !material.map;
+    })).toBe(true);
     expect(camera.parent).toBeNull();
   });
 });

@@ -41,22 +41,37 @@ describe("rendered floor ownership and placement", () => {
     expect(ceilingCenters).toEqual(actual);
     expect(floor.counts.markers).toBe(4);
     expect(floor.counts.instances).toBeGreaterThan(floors.count * 2);
-    expect(floor.root.children.length).toBeLessThanOrEqual(8);
+    expect(floor.root.children.length).toBeLessThanOrEqual(20);
     const wallMeshes = floor.root.children.filter((item: any) => item.material === library.materials.stone) as any[];
     expect(wallMeshes).toHaveLength(3); // ceiling plus the two oriented boundary batches
-    for (const wallMesh of wallMeshes.slice(1)) for (let i = 0; i < wallMesh.count; i++) {
-      wallMesh.getMatrixAt(i, point);
-      expect(point.elements[13]).toBe(1.5);
-      const wx = point.elements[12], wz = point.elements[14];
-      const width = 2 * Math.abs(point.elements[0]), depth = 2 * Math.abs(point.elements[10]);
-      expect(width < 0.2 || depth < 0.2).toBe(true);
-      for (let z = 0; z < plan.height; z++) for (let x = 0; x < plan.width; x++) if (plan.tiles[z * plan.width + x] === 1) {
-        const cx = x * 2 + 1, cz = z * 2 + 1;
-        const overlapsX = Math.abs(cx - wx) < 1 + width / 2 - 1e-4;
-        const overlapsZ = Math.abs(cz - wz) < 1 + depth / 2 - 1e-4;
-        expect(overlapsX && overlapsZ).toBe(false);
+    const masonry=wallMeshes.slice(1);
+    expect(masonry.every(mesh=>mesh.geometry.type==="ExtrudeGeometry")).toBe(true);
+    expect(masonry.every(mesh=>mesh.count>0&&mesh.instanceColor!==null)).toBe(true);
+    expect(masonry.reduce((sum,mesh)=>sum+mesh.count,0)).toBeGreaterThan(100);
+    for(const mesh of masonry){
+      mesh.geometry.computeBoundingBox();
+      const bounds=mesh.geometry.boundingBox!;
+      const halfX=Math.max(Math.abs(bounds.min.x),Math.abs(bounds.max.x));
+      const halfZ=Math.max(Math.abs(bounds.min.z),Math.abs(bounds.max.z));
+      for(let i=0;i<mesh.count;i++){
+        mesh.getMatrixAt(i,point);
+        const ex=Math.abs(point.elements[0])*halfX+Math.abs(point.elements[8])*halfZ;
+        const ez=Math.abs(point.elements[2])*halfX+Math.abs(point.elements[10])*halfZ;
+        const minX=Math.max(0,Math.floor((point.elements[12]-ex)/2)),maxX=Math.min(plan.width-1,Math.floor((point.elements[12]+ex)/2));
+        const minZ=Math.max(0,Math.floor((point.elements[14]-ez)/2)),maxZ=Math.min(plan.height-1,Math.floor((point.elements[14]+ez)/2));
+        for(let z=minZ;z<=maxZ;z++)for(let x=minX;x<=maxX;x++)if(plan.tiles[z*plan.width+x]===1){
+          const cx=x*2+1,cz=z*2+1;
+          const overlapsX=Math.abs(cx-point.elements[12])<1+ex-1e-5;
+          const overlapsZ=Math.abs(cz-point.elements[14])<1+ez-1e-5;
+          expect(overlapsX&&overlapsZ,`stone footprint overlaps walkable tile ${x},${z}: ${JSON.stringify({center:[point.elements[12],point.elements[14]],extent:[ex,ez],tile:[cx,cz]})}`).toBe(false);
+        }
       }
     }
+    expect(floor.root.children.filter((item:any)=>item.type==="PointLight").length).toBeGreaterThan(0);
+    expect(floor.root.children.filter((item:any)=>item.type==="PointLight").length).toBeLessThanOrEqual(4);
+    const moss=floor.root.children.find((item:any)=>item.geometry?.type==="PlaneGeometry") as any;
+    expect(moss.count).toBeGreaterThan(0);
+    expect(moss.count).toBeLessThanOrEqual(16);
     for (const kind of ["entry", "boss", "reward", "exit"] as const) {
       const markerMaterial = library.materials[kind];
       const mesh = floor.root.children.find((item: any) => item.material === markerMaterial) as any;
@@ -86,15 +101,22 @@ describe("rendered floor ownership and placement", () => {
     expect(borrowedDispose).not.toHaveBeenCalled();
     const rendered = createRenderedFloor(plan, library);
     const ownedGeometries = new Set<any>();
-    for (const mesh of rendered.root.children as any) {
+    const ownedMeshes=(rendered.root.children as any[]).filter((mesh)=>mesh.geometry);
+    const ownedMeshCount=ownedMeshes.length;
+    const ownedMaterials=new Set<any>();
+    for (const mesh of ownedMeshes) {
       ownedGeometries.add(mesh.geometry);
       mesh.addEventListener("dispose", instanceDispose);
+      const materials=Array.isArray(mesh.material)?mesh.material:[mesh.material];
+      for(const material of materials) if(!Object.values(library.materials).includes(material)) ownedMaterials.add(material);
     }
     for (const geometry of ownedGeometries) geometry.addEventListener("dispose", ownedDispose);
+    const materialDisposals=[...ownedMaterials].map((material)=>{const listener=vi.fn();material.addEventListener("dispose",listener);return listener;});
     rendered.dispose(); rendered.dispose();
     expect(ownedGeometries.size).toBe(rendered.counts.geometries);
     expect(ownedDispose).toHaveBeenCalledTimes(ownedGeometries.size);
-    expect(instanceDispose).toHaveBeenCalledTimes(rendered.root.children.length === 0 ? 8 : 0);
+    expect(instanceDispose).toHaveBeenCalledTimes(ownedMeshCount);
+    expect(materialDisposals.every((listener)=>listener.mock.calls.length===1)).toBe(true);
     expect(borrowedDispose).not.toHaveBeenCalled();
     expect(borrowedTextureDispose).not.toHaveBeenCalled();
     expect(library.materials.floor).toBeTruthy();

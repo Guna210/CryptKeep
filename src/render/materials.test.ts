@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MeshBasicMaterial, MeshStandardMaterial, NearestFilter, RepeatWrapping, SRGBColorSpace, UnsignedByteType, RGBAFormat } from "three";
+import { MeshBasicMaterial, MeshStandardMaterial, LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace, UnsignedByteType, RGBAFormat } from "three";
 import { BASE_TILE_KINDS } from "./textures/base";
 import { createMaterialLibrary } from "./materials";
 
@@ -12,9 +12,9 @@ describe("material library ownership", () => {
       expect(texture.image).toMatchObject({ width: 16, height: 16 });
       expect(texture.type).toBe(UnsignedByteType);
       expect(texture.format).toBe(RGBAFormat);
-      expect(texture.magFilter).toBe(NearestFilter);
-      expect(texture.minFilter).toBe(NearestFilter);
-      expect(texture.generateMipmaps).toBe(false);
+      expect(texture.magFilter).toBe(LinearFilter);
+      expect(texture.minFilter).toBe(LinearMipmapLinearFilter);
+      expect(texture.generateMipmaps).toBe(true);
       expect(texture.colorSpace).toBe(SRGBColorSpace);
       expect(library.materials[kind].map).toBe(texture);
       expect(library.materials[kind]).toBe(library.materials[kind]);
