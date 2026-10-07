@@ -120,6 +120,8 @@ CK-00-04 contract: pure DOM/Three/RAF-independent clock; documented timestamp/st
 Latest accepted-task implementation checkpoint: `0ac761da6b2c1a58393f6af283f32eb2db41100b` (CK-03-09). Actual GitHub master, origin/master and local HEAD matched immediately after push. Later source-identical recovery receipts may advance HEAD; their publication does not accept another implementation task. Recheck the working tree on resume.
 
 During future implementation, track active tasks and accepted-task summaries here, with builder/reviewer/fixer agent IDs and models, stage, round (1–3), reviewed snapshot, handoff/report links, acceptance evidence, unresolved finding IDs and next action. Keep full reports in per-task records rather than copying them here. Distinguish submitted work from independently reviewed/accepted work; the orchestrator makes the final acceptance decision. Resume recorded rounds after compaction without resetting counters or duplicating agents.
+| CK-ART-01 | Builder/fixer `/root/cartoon_art_builder`; reviewer `/root/cartoon_art_reviewer_r1`; both `gpt-6-luna` | Accepted; reviewed source pushed on `cartoon-art-preview`; round1 verification PASS | Cartoon art experiment only; reviewed66e5f46, hostedrun37625873118 passed171app/type/tool/build/25browser, main/reviewer opened PNG. F01/F02 resolved; source23hashes preserved in [repair](progress/CK-ART-01.round-1-fix.md), [verification](reviews/CK-ART-01/round-1-verification.md). Master unchanged; no merge. |
+
 
 ## Delegation and review rules for later implementation
 
@@ -138,11 +140,10 @@ During future implementation, track active tasks and accepted-task summaries her
 - Implementation checkpoint `3cb1b0431e413c749857308810bc8e4ff43f5e66` was verified against actual GitHub master and the local tracking ref immediately after push. Hosted [run 37508407368](https://github.com/Guna210/CryptKeep/actions/runs/37508407368) completed successfully on that exact checkpoint (73 app / 7 tooling / 9 browser tests, typecheck and build). Final recovery metadata may advance the branch without changing that implementation.
 - No M01 builder/reviewer work remains active. At M01 completion the app was a generated floor-1 overview with seed controls and role markers; it did not yet have first-person movement, mouse look, monsters, combat, descent or saving. M02 has since added first-person exploration and safe pause/Resume. Generation data supports floor numbers 1–100, but this does not establish a playable campaign.
 
-| CK-ART-01 | Builder/fixer `/root/cartoon_art_builder`; reviewer `/root/cartoon_art_reviewer_r1`; both `gpt-6-luna` | Accepted; reviewed source pushed on `cartoon-art-preview`; round1 verification PASS | Cartoon art experiment only; reviewed66e5f46, hostedrun37625873118 passed171app/type/tool/build/25browser, main/reviewer opened PNG. F01/F02 resolved; source23hashes preserved in [repair](progress/CK-ART-01.round-1-fix.md), [verification](reviews/CK-ART-01/round-1-verification.md). Master unchanged; no merge. |
 
 ## Immediate next action
 
-CK-ART-01 is accepted and its reviewed implementation is published on cartoon-art-preview; finish acceptance-record publication, then await owner feedback on the visual preview. Do not merge or continue art/game implementation automatically. CK-04-01 is the first ready M04 card (depends on accepted CK-03-01 and CK-00-05), but M04 remains unauthorized.
+CK-ART-01 is accepted and its reviewed implementation is published on cartoon-art-preview; acceptance records published as1448f65; await owner feedback on the visual preview. Do not merge or continue art/game implementation automatically. CK-04-01 is the first ready M04 card (depends on accepted CK-03-01 and CK-00-05), but M04 remains unauthorized.
 
 ## Active M02 continuation
 
@@ -164,7 +165,7 @@ CK-ART-01 is accepted and its reviewed implementation is published on cartoon-ar
 
 ## Completed art experiment — current recovery
 
-- **CK-ART-01 accepted; reviewed implementation pushed to `cartoon-art-preview`.** Branch-only reversible cartoon experiment; master remains `e225151713f33963dcae6ceef4dc20d302036439`, no merge/PR. Full campaign cards remain35/196 accepted; this extra art experiment does not advance M04.
+- **CK-ART-01 accepted; reviewed implementation and acceptance records pushed to `cartoon-art-preview`.** Acceptance1448f65; closing coordination docs may advance branch HEAD while source remains reviewed66e5f46. Branch-only reversible cartoon experiment; master remains `e225151713f33963dcae6ceef4dc20d302036439`, no merge/PR. Full campaign cards remain35/196 accepted; this extra art experiment does not advance M04.
 - Builder/fixer `/root/cartoon_art_builder`, independent reviewer `/root/cartoon_art_reviewer_r1`, both explicit `gpt-6-luna`. Round1 one coordinated repair; verification PASS, F01/F02 resolved, no unresolved/new findings. No active agent work remains.
 - Final reviewed source commit `66e5f46a748f4cd467d4be5c0154e72c617976a5`, tree `daca987abeb61dca3f933379368aff9105a0a50b`. Hosted [run37625873118](https://github.com/Guna210/CryptKeep/actions/runs/37625873118), job112807347541 SUCCESS: typecheck,171 app tests, tooling command, build and25 Chromium checks. Independent review also passed local checks; initial review supplemental tooling7 named cases passed. Acceptance documents may advance branch HEAD without changing this tested source.
 - Smooth viewport rendering, antialiasing, DPR<=1.5 and2.4MP cap; instanced beveled teal/slate masonry with readable untextured faces/dark mortar, calmer slab textures, original faceted sword, restrained moss and up to2 warm sconces. Floor-only10draw-call bound, all25replacement/native movement/dash/collision/pause/sword assertions retained. CI-onlyserialbrowser avoids software-renderer contention; simulation/input/generation/collision/role placement unchanged.
