@@ -14,7 +14,7 @@ export interface MaterialLibrary {
 }
 
 /** Owns one texture and one material per recipe. Meshes may borrow material instances until disposal. */
-export function createMaterialLibrary(seed: string, size = 64): MaterialLibrary {
+export function createMaterialLibrary(seed: string, size = 128): MaterialLibrary {
   const textures = {} as Record<BaseTileKind, DataTexture>;
   const materials = {} as Record<BaseTileKind, BaseMaterial>;
   for (const kind of BASE_TILE_KINDS) {

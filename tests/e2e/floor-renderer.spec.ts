@@ -15,7 +15,7 @@ test("renders seeded floor-only geometry and replaces/disposes floors repeatedly
   await page.screenshot({ path: "docs/evidence/CK-01-07/seed-b.png" });
   expect(seedB.hash).not.toBe(seedA.hash);
   expect(seedB.counts.markers).toBe(4);
-  expect(seedB.rendererCounts.drawCalls).toBeLessThanOrEqual(10);
+  expect(seedB.rendererCounts.drawCalls).toBeLessThanOrEqual(13); // three fixed extra torch batches for iron/wood/wrap and two flame layers
   const repeated = await page.evaluate(() => window.floorRendererFixture.cycle(25));
   expect(repeated).toHaveLength(25);
   for (const report of repeated) {

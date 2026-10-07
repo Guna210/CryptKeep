@@ -41,6 +41,12 @@ describe("sword viewmodel", () => {
     const sibling = new Group(); camera.add(sibling);
     const world = { scene, camera } as Pick<WorldRenderer, "scene" | "camera">;
     const model = createSwordViewmodel(world);
+    const geometry=(name:string)=>(model.root.getObjectByName(name) as Mesh|undefined)?.geometry;
+    expect(geometry("rounded-leather-grip")?.type).toBe("CylinderGeometry");
+    expect(geometry("rounded-brass-pommel")?.type).toBe("SphereGeometry");
+    expect(geometry("curved-brass-crossguard")?.type).toBe("ExtrudeGeometry");
+    expect(geometry("soft-edged-steel-blade")?.attributes.position?.count).toBeGreaterThan(200);
+    expect(geometry("leather-wrap-stitch")?.type).toBe("TubeGeometry");
     expect(scene.children).toContain(model.root);
     expect(camera.parent).toBeNull();
     expect(camera.children).toEqual([sibling]);

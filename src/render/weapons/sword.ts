@@ -1,6 +1,6 @@
 import {
-  BoxGeometry, BufferGeometry, Euler, ExtrudeGeometry, Group, Mesh, MeshStandardMaterial,
-  Quaternion, Shape, Vector3,
+  BoxGeometry, BufferGeometry, CylinderGeometry, Euler, ExtrudeGeometry, Group, Mesh, MeshStandardMaterial,
+  Quaternion, Shape, SphereGeometry, Vector3, CatmullRomCurve3, TubeGeometry,
 } from "three";
 import type { WorldRenderer } from "../renderer";
 import type { SwordState } from "../../weapons/sword";
@@ -64,9 +64,10 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
   const bladeMaterial = new MeshStandardMaterial({ color: 0xa9c7c8, roughness: 0.3, metalness: 0.78, emissive: 0x000000 });
   const leatherMaterial = new MeshStandardMaterial({ color: 0x30231d, roughness: 0.92, metalness: 0 });
   const goldMaterial = new MeshStandardMaterial({ color: 0xc9924e, roughness: 0.38, metalness: 0.7 });
+  const wrapMaterial = new MeshStandardMaterial({ color: 0x6f5844, roughness: 0.96, metalness: 0.02 });
   const glowMaterial = new MeshStandardMaterial({ color: 0xffc56c, roughness: 0.4, metalness: 0.18, emissive: 0x000000 });
   const geometries: BufferGeometry[] = [];
-  const materials = [bladeMaterial, leatherMaterial, goldMaterial, glowMaterial];
+  const materials = [bladeMaterial, leatherMaterial, goldMaterial, wrapMaterial, glowMaterial];
   const mesh = (geometry: BufferGeometry, material: MeshStandardMaterial, name: string) => {
     geometries.push(geometry);
     const part = new Mesh(geometry, material);
@@ -75,15 +76,25 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
     return part;
   };
   const bladeShape = new Shape();
-  bladeShape.moveTo(-0.055, 0.02); bladeShape.lineTo(0.055, 0.02); bladeShape.lineTo(0.052, 0.56);
-  bladeShape.lineTo(0, 0.73); bladeShape.lineTo(-0.052, 0.56); bladeShape.closePath();
-  const bladeGeometry = new ExtrudeGeometry(bladeShape, { depth: 0.075, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.018, bevelThickness: 0.018, curveSegments: 1 });
+  bladeShape.moveTo(-0.052, 0.02); bladeShape.quadraticCurveTo(-0.058,0.31,-0.047,0.56);
+  bladeShape.quadraticCurveTo(-0.035,0.65,0,0.73); bladeShape.quadraticCurveTo(0.035,0.65,0.047,0.56);
+  bladeShape.quadraticCurveTo(0.058,0.31,0.052,0.02); bladeShape.closePath();
+  const bladeGeometry = new ExtrudeGeometry(bladeShape, { depth: 0.075, bevelEnabled: true, bevelSegments: 4, steps: 1, bevelSize: 0.018, bevelThickness: 0.018, curveSegments: 8 });
+  bladeGeometry.computeVertexNormals();
   bladeGeometry.translate(0, 0, -0.0375);
-  const blade = mesh(bladeGeometry, bladeMaterial, "faceted-steel-blade");
+  const blade = mesh(bladeGeometry, bladeMaterial, "soft-edged-steel-blade");
   blade.position.z = 0.01;
-  mesh(new BoxGeometry(0.31, 0.055, 0.075), goldMaterial, "crossguard").position.y = -0.015;
-  mesh(new BoxGeometry(0.085, 0.31, 0.085), leatherMaterial, "wrapped-grip").position.y = -0.19;
-  mesh(new BoxGeometry(0.14, 0.095, 0.095), goldMaterial, "pommel").position.y = -0.36;
+  const guardShape=new Shape();
+  guardShape.moveTo(-0.17,-0.025);guardShape.quadraticCurveTo(-0.14,0.005,-0.105,0.012);guardShape.quadraticCurveTo(0,0.035,0.105,0.012);
+  guardShape.quadraticCurveTo(0.14,0.005,0.17,-0.025);guardShape.quadraticCurveTo(0.15,-0.055,0.12,-0.052);
+  guardShape.quadraticCurveTo(0,-0.025,-0.12,-0.052);guardShape.quadraticCurveTo(-0.15,-0.055,-0.17,-0.025);guardShape.closePath();
+  const guardGeometry=new ExtrudeGeometry(guardShape,{depth:.065,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.012,bevelThickness:.012,curveSegments:5});
+  guardGeometry.translate(0,0,-.0325);guardGeometry.computeVertexNormals();
+  mesh(guardGeometry,goldMaterial,"curved-brass-crossguard").position.y=-0.015;
+  mesh(new CylinderGeometry(0.043,0.048,0.30,16,1), leatherMaterial, "rounded-leather-grip").position.y = -0.19;
+  const wrapPoints=Array.from({length:65},(_,i)=>{const t=i/64,angle=t*Math.PI*8;return new Vector3(Math.cos(angle)*.049,-.33+t*.27,Math.sin(angle)*.049);});
+  mesh(new TubeGeometry(new CatmullRomCurve3(wrapPoints),128,.005,6,false),wrapMaterial,"leather-wrap-stitch");
+  mesh(new SphereGeometry(0.071,16,12), goldMaterial, "rounded-brass-pommel").position.y = -0.36;
   const charge = mesh(new BoxGeometry(0.16, 0.17, 0.045), glowMaterial, "charge-rune");
   charge.position.set(0, 0.34, 0.035);
   charge.visible = false;
