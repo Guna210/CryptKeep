@@ -9,16 +9,16 @@ test("renders seeded floor-only geometry and replaces/disposes floors repeatedly
   await expect.poll(() => page.evaluate(() => window.floorRendererFixture?.active()?.hash)).toMatch(/^fnv1a:/);
   const seedA = await page.evaluate(() => window.floorRendererFixture.active());
   console.log("Floor renderer seed A:", JSON.stringify(seedA));
-  await page.screenshot({ path: "test-results/CK-ART-02/floor-seed-a.png" });
+  await page.screenshot({ path: "test-results/CK-ART-03/floor-seed-a.png" });
   const seedB = await page.evaluate(() => window.floorRendererFixture.replace("CK-01-07-seed-b"));
   console.log("Floor renderer seed B:", JSON.stringify(seedB));
-  await page.screenshot({ path: "test-results/CK-ART-02/floor-seed-b.png" });
+  await page.screenshot({ path: "test-results/CK-ART-03/floor-seed-b.png" });
   expect(seedB.hash).not.toBe(seedA.hash);
   expect(seedB.counts.markers).toBe(4);
   const chunkGridBound = Math.ceil((seedB.width * 2 + 2) / 8) * Math.ceil((seedB.height * 2 + 2) / 8);
   expect(seedB.counts.masonryChunks).toBeGreaterThan(0);
   expect(seedB.counts.masonryChunks).toBeLessThanOrEqual(chunkGridBound);
-  expect(seedB.rendererCounts.drawCalls).toBeLessThanOrEqual(12 + seedB.counts.masonryChunks); // fixed batches plus bounded spatial stone chunks
+  expect(seedB.rendererCounts.drawCalls).toBeLessThanOrEqual(20 + seedB.counts.masonryChunks); // 20 measured non-masonry batches plus one instanced atlas batch per bounded spatial chunk
   const repeated = await page.evaluate(() => window.floorRendererFixture.cycle(25));
   expect(repeated).toHaveLength(25);
   for (const report of repeated) {

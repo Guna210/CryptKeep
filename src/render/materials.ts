@@ -5,7 +5,7 @@ import {
 import { BASE_TILE_KINDS, createBaseTile, type BaseTileKind } from "./textures/base";
 import { createPaintedArtwork, type PaintedSurface } from "./textures/painted";
 
-const PAINTED_SURFACES = ["stone", "floor", "door", "entry", "boss", "reward", "exit", "steel", "leather", "brass", "wood", "iron", "trim"] as const;
+export const PAINTED_SURFACES = ["stone", "floor", "door", "entry", "boss", "reward", "exit", "steel", "leather", "brass", "wood", "iron", "trim"] as const;
 
 export type BaseMaterial = MeshStandardMaterial | MeshBasicMaterial;
 export interface MaterialLibrary {

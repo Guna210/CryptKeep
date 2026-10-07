@@ -3,6 +3,7 @@ import { expect, test } from "../harness/browser";
 import { generateFloor } from "../../src/dungeon/generate";
 import { Tile } from "../../src/dungeon/types";
 import { isPoseValid } from "../../src/player/state";
+import { STAMINA_REGEN_DELAY_SECONDS, STAMINA_REGEN_PER_SECOND } from "../../src/player/resources";
 
 test("real player input moves, mouse changes the camera, and release stops motion", async ({ page, browserHarness }) => {
   await page.setViewportSize({width:1280,height:800});
@@ -188,9 +189,17 @@ test("swept movement stops at a generated wall with the full player circle clear
   await page.keyboard.down("w");
   await page.keyboard.down("Shift");
   await expect.poll(async () => (await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!)).lastSample?.held.includes("sprint")).toBe(true);
-  const refillStartTick=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick);
-  await expect.poll(()=>page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick),{timeout:10000}).toBeGreaterThanOrEqual(refillStartTick+45);
-  await expect.poll(async () => (await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!)).resources!.stamina.current, {timeout:5000}).toBe(100);
+  const refillStart=await page.evaluate(()=>{
+    const snapshot=window.__cryptkeepDiagnostics!.snapshot();
+    return {tick:snapshot.floor!.tick,current:snapshot.player!.resources!.stamina.current,idle:snapshot.player!.regenTimers!.staminaIdleSeconds};
+  });
+  const refillSeconds=Math.max(0,STAMINA_REGEN_DELAY_SECONDS-refillStart.idle)+
+    (100-refillStart.current)/STAMINA_REGEN_PER_SECOND;
+  const refillTicks=Math.ceil(refillSeconds*60)+1; // cover the fixed-step boundary when regeneration crosses the delay
+  await expect.poll(async()=>page.evaluate(({startTick,minimumTicks})=>{
+    const snapshot=window.__cryptkeepDiagnostics!.snapshot();
+    return snapshot.floor!.tick>=startTick+minimumTicks ? snapshot.player!.resources!.stamina.current : undefined;
+  },{startTick:refillStart.tick,minimumTicks:refillTicks}),{timeout:10000}).toBe(100);
   const heldAtWall = await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!);
   await page.waitForTimeout(150);
   expect((await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!)).resources!.stamina.current).toBe(heldAtWall.resources!.stamina.current);

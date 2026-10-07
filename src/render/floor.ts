@@ -1,5 +1,5 @@
 import {
-  BoxGeometry, ConeGeometry, CylinderGeometry, ExtrudeGeometry, Group, InstancedMesh, Matrix4, PlaneGeometry,
+  BoxGeometry, ConeGeometry, CylinderGeometry, ExtrudeGeometry, Group, InstancedBufferAttribute, InstancedMesh, Matrix4, PlaneGeometry,
   Color, Mesh, MeshStandardMaterial, OctahedronGeometry, PointLight, Shape, Vector3, BufferGeometry,
   TubeGeometry, CatmullRomCurve3, Path,
 } from "three";
@@ -12,7 +12,7 @@ import type { Grid } from "../dungeon/types";
 
 export const FLOOR_CELL_METERS = 2;
 export const FLOOR_WALL_HEIGHT = 3;
-export const MASONRY_CHUNK_METERS = 32;
+export const MASONRY_CHUNK_METERS = 8;
 export interface RenderedFloorOptions { readonly ceilingVisible?: boolean }
 export interface RenderedFloor {
   readonly root: Group;
@@ -80,7 +80,7 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
     const surface = new BoxGeometry(2, 0.1, 2);
     addInstances(surface, library.materials.floor, walkable);
     const ceiling = new BoxGeometry(2, 0.1, 2);
-    addInstances(ceiling, library.materials.stone, walkable.map((p) => ({ ...p, y: FLOOR_WALL_HEIGHT + 0.05 })), options.ceilingVisible !== false);
+    addInstances(ceiling, library.materials.floor, walkable.map((p) => ({ ...p, y: FLOOR_WALL_HEIGHT + 0.05 })), options.ceilingVisible !== false);
     const mortarMaterial = new MeshStandardMaterial({ color: 0x344c4e, roughness: 1 }); ownedMaterials.push(mortarMaterial);
     const mortarGeometry=new BoxGeometry(1,1,1); geometries.add(mortarGeometry);
     const mortarEdges=[...wallX.map(p=>({...p,normal:"x" as const})),...wallZ.map(p=>({...p,normal:"z" as const}))];
@@ -109,12 +109,7 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
     const masonryBase=mergeVertices(stoneSurface,1e-4);
     stoneSurface.dispose();
     masonryBase.computeVertexNormals();
-    const masonryVariants=Array.from({length:4},(_,variant)=>{
-      const geometry=masonryBase.clone(),uv=geometry.getAttribute("uv");
-      for(let i=0;i<uv.count;i++)uv.setXY(i,((variant%2)+uv.getX(i))/2,(Math.floor(variant/2)+uv.getY(i))/2);
-      uv.needsUpdate=true;geometry.computeBoundingBox();return geometry;
-    });
-    masonryBase.dispose();
+    geometries.add(masonryBase);
     const blocks: Array<{x:number;y:number;z:number;yaw:number;variant:number}>=[];
     for(const edge of wallX)for(let row=0;row<3;row++)for(let half=0;half<2;half++){
       const along=edge.z+(half?0.5:-0.5);
@@ -125,6 +120,11 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
       blocks.push({x:along,y:0.5+row,z:edge.z,yaw:0,variant:Math.abs(Math.floor(along*3+edge.z*7+row*5))%4});
     }
     const masonryMaterial=new MeshStandardMaterial({map:library.textures.stone,color:0xffffff,roughness:0.92,metalness:0,emissive:0x10201f,emissiveIntensity:0.12});
+    masonryMaterial.onBeforeCompile=(shader)=>{
+      shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nattribute vec2 atlasOffset;");
+      shader.vertexShader=shader.vertexShader.replace("#include <uv_vertex>","#include <uv_vertex>\n#ifdef USE_MAP\n vMapUv = vMapUv * 0.5 + atlasOffset;\n#endif");
+    };
+    masonryMaterial.customProgramCacheKey=()=>"cryptkeep-stone-atlas-instanced-v1";
     ownedMaterials.push(masonryMaterial);
     if(blocks.length){
       const chunks=new Map<string,typeof blocks>();
@@ -133,20 +133,19 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
         const group=chunks.get(key)??[];group.push(block);chunks.set(key,group);
       }
       masonryChunkCount=chunks.size;
-      let colorOrdinal=0;
       for(const [key,chunk] of chunks){
-        for(let variant=0;variant<4;variant++){
-          const selected=chunk.filter((block)=>block.variant===variant);if(!selected.length)continue;
-          const geometry=masonryVariants[variant]!;geometries.add(geometry);
-          const mesh=new InstancedMesh(geometry,masonryMaterial,selected.length);
-          selected.forEach((p,i)=>{
-            matrix.makeRotationY(p.yaw);matrix.scale(new Vector3(1,1,1));matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);
-            mesh.setColorAt(i,new Color(STONE_TONES[(colorOrdinal++*7+Math.floor(p.x+p.z))%STONE_TONES.length]));
-          });
-          mesh.name=`rounded-stone-course:${key}:paint-${variant}`;mesh.frustumCulled=true;mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
-        }
+        const geometry=masonryBase.clone();
+        geometry.setAttribute("atlasOffset",new InstancedBufferAttribute(new Float32Array(chunk.length*2),2));
+        const offsets=geometry.getAttribute("atlasOffset"),mesh=new InstancedMesh(geometry,masonryMaterial,chunk.length);geometries.add(geometry);
+        chunk.forEach((p,i)=>{
+          matrix.makeRotationY(p.yaw);matrix.scale(new Vector3(1,1,1));matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);
+          offsets.setXY(i,(p.variant%2)*0.5,Math.floor(p.variant/2)*0.5);
+          mesh.setColorAt(i,new Color(STONE_TONES[(i*7+Math.floor(p.x+p.z))%STONE_TONES.length]));
+        });
+        offsets.needsUpdate=true;mesh.name=`rounded-stone-course:${key}`;mesh.frustumCulled=true;mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
       }
     }
+    masonryBase.dispose();geometries.delete(masonryBase);
     // The entry-facing wall torch sits in the yaw-zero forward view; one further fixture lights the route.
     const allSconceEdges = [...wallX.map(p=>({...p,face:"x" as const})), ...wallZ.map(p=>({...p,face:"z" as const}))];
     const entryX=plan.roles.entry.x*2+1, entryZ=plan.roles.entry.z*2+1;

@@ -28,7 +28,11 @@ describe("rendered floor ownership and placement", () => {
       actual.add(`${Math.round(point.elements[12] / 2 - 0.5)},${Math.round(point.elements[14] / 2 - 0.5)}`);
     }
     for (let z = 0; z < plan.height; z++) for (let x = 0; x < plan.width; x++) if (plan.tiles[z * plan.width + x] === 1) expect(actual.has(`${x},${z}`)).toBe(true);
-    const ceilings = floor.root.children.find((item: any) => item.material === library.materials.stone) as any;
+    const ceilings = floor.root.children.find((item: any) => {
+      if (item.material !== library.materials.floor || item.geometry.parameters?.height !== 0.1) return false;
+      item.getMatrixAt(0, point);
+      return Math.abs(point.elements[13] - 3.05) < 0.001;
+    }) as any;
     expect(ceilings.count).toBe(floors.count);
     const ceilingCenters = new Set<string>();
     for (let i = 0; i < floors.count; i++) {
@@ -41,24 +45,29 @@ describe("rendered floor ownership and placement", () => {
     expect(ceilingCenters).toEqual(actual);
     expect(floor.counts.markers).toBe(4);
     expect(floor.counts.instances).toBeGreaterThan(floors.count * 2);
-    expect(floor.root.children.length).toBeLessThanOrEqual(23+floor.counts.masonryChunks*4); // four atlas selections per spatial batch plus room dressing
-    const wallMeshes = floor.root.children.filter((item: any) => item.material === library.materials.stone) as any[];
-    expect(wallMeshes).toHaveLength(1); // ceiling retains the shared stone library material
+    expect(floor.root.children.length).toBeLessThanOrEqual(23+floor.counts.masonryChunks); // fixed decor batches plus one spatial stone batch per chunk
     const masonry=floor.root.children.filter((item:any)=>item.name?.startsWith("rounded-stone-course:")) as any[];
-    expect(masonry.length).toBeGreaterThanOrEqual(floor.counts.masonryChunks);
-    expect(masonry.length).toBeLessThanOrEqual(floor.counts.masonryChunks*4);
-    expect(new Set(masonry.map(mesh=>mesh.name.split(":").at(-1))).size).toBeGreaterThanOrEqual(3);
+    expect(masonry.length).toBe(floor.counts.masonryChunks);
     expect(masonry.every(mesh=>mesh.count>0&&mesh.instanceColor!==null)).toBe(true);
     expect(masonry.every(mesh=>mesh.frustumCulled)).toBe(true);
     expect(masonry.every(mesh=>mesh.material===masonry[0].material)).toBe(true);
-    for(const variant of new Set(masonry.map(mesh=>mesh.name.split(":").at(-1)))){
-      const batches=masonry.filter(mesh=>mesh.name.endsWith(`:${variant}`));
-      expect(batches.every(mesh=>mesh.geometry===batches[0].geometry)).toBe(true);
+    expect(masonry.every(mesh=>mesh.geometry.getAttribute("atlasOffset").count===mesh.count)).toBe(true);
+    expect(masonry.every(mesh=>mesh.geometry.getAttribute("atlasOffset").isInstancedBufferAttribute)).toBe(true);
+    const selectedQuadrants = new Set<number>();
+    for (const mesh of masonry) {
+      const offsets=mesh.geometry.getAttribute("atlasOffset");
+      for(let i=0;i<offsets.count;i++) selectedQuadrants.add(offsets.getX(i)*2+offsets.getY(i)*4);
     }
+    expect(selectedQuadrants).toEqual(new Set([0,1,2,3]));
     expect(masonry[0].material.map).toBe(library.textures.stone);
+    const shader={vertexShader:"#include <common>\nvoid main(){\n#include <uv_vertex>\n}",fragmentShader:""};
+    masonry[0].material.onBeforeCompile(shader as any, {} as any);
+    expect(shader.vertexShader).toContain("attribute vec2 atlasOffset;");
+    expect(shader.vertexShader).toContain("vMapUv = vMapUv * 0.5 + atlasOffset;");
+    expect(masonry[0].material.customProgramCacheKey()).toContain("stone-atlas-instanced");
     expect(masonry[0].geometry.index).not.toBeNull();
-    expect(masonry[0].geometry.attributes.position.count).toBeLessThan(800);
-    expect(masonry[0].geometry.index.count/3).toBeLessThanOrEqual(444);
+    expect(masonry[0].geometry.attributes.position.count).toBe(224);
+    expect(masonry[0].geometry.index.count/3).toBe(444);
     expect(masonry[0].geometry.attributes.normal.count).toBe(masonry[0].geometry.attributes.position.count);
     for(let i=0;i<masonry[0].geometry.attributes.normal.count;i++){
       const normal=masonry[0].geometry.attributes.normal;
