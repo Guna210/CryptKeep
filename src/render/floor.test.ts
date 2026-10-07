@@ -1,4 +1,4 @@
-import { Group, Matrix4 } from "three";
+import { Frustum, Group, Matrix4, PerspectiveCamera, Vector3 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { generateFloor } from "../dungeon/generate";
 import { createMaterialLibrary } from "./materials";
@@ -41,15 +41,26 @@ describe("rendered floor ownership and placement", () => {
     expect(ceilingCenters).toEqual(actual);
     expect(floor.counts.markers).toBe(4);
     expect(floor.counts.instances).toBeGreaterThan(floors.count * 2);
-    expect(floor.root.children.length).toBeLessThanOrEqual(16); // five fixed torch batches, two bounded sconces and lights
+    expect(floor.root.children.length).toBeLessThanOrEqual(15+floor.counts.masonryChunks); // fixed batches plus spatial masonry chunks
     const wallMeshes = floor.root.children.filter((item: any) => item.material === library.materials.stone) as any[];
     expect(wallMeshes).toHaveLength(1); // ceiling retains the shared stone library material
-    const masonry=floor.root.children.filter((item:any)=>item.name==="rounded-stone-course") as any[];
-    expect(masonry).toHaveLength(1); // both wall orientations share one geometry/material batch
+    const masonry=floor.root.children.filter((item:any)=>item.name?.startsWith("rounded-stone-course:")) as any[];
+    expect(masonry).toHaveLength(floor.counts.masonryChunks);
+    expect(masonry.length).toBeGreaterThan(1);
     expect(masonry.every(mesh=>mesh.count>0&&mesh.instanceColor!==null)).toBe(true);
+    expect(masonry.every(mesh=>mesh.frustumCulled)).toBe(true);
+    expect(masonry.every(mesh=>mesh.geometry===masonry[0].geometry&&mesh.material===masonry[0].material)).toBe(true);
     expect(masonry[0].material.map).toBe(library.textures.stone);
-    expect(masonry[0].geometry.parameters.shapes.curves.filter((curve:any)=>curve.type==="EllipseCurve")).toHaveLength(4);
-    expect(masonry[0].geometry.attributes.position.count).toBeGreaterThan(200);
+    expect(masonry[0].geometry.index).not.toBeNull();
+    expect(masonry[0].geometry.attributes.position.count).toBeLessThan(800);
+    expect(masonry[0].geometry.index.count/3).toBeLessThanOrEqual(444);
+    expect(masonry[0].geometry.attributes.normal.count).toBe(masonry[0].geometry.attributes.position.count);
+    for(let i=0;i<masonry[0].geometry.attributes.normal.count;i++){
+      const normal=masonry[0].geometry.attributes.normal;
+      expect(new Vector3(normal.getX(i),normal.getY(i),normal.getZ(i)).length()).toBeCloseTo(1,3);
+    }
+    const profilePoints=masonry[0].geometry.attributes.position;
+    expect(Array.from({length:profilePoints.count},(_,i)=>[profilePoints.getX(i),profilePoints.getY(i)]).some(([x,y])=>x>0.32&&x<0.45&&y>0.32&&y<0.45)).toBe(true);
     const faceUv=masonry[0].geometry.attributes.uv;
     expect(Math.min(...faceUv.array)).toBeGreaterThanOrEqual(-1e-6);
     expect(Math.max(...faceUv.array)).toBeLessThanOrEqual(1+1e-6);
@@ -64,8 +75,8 @@ describe("rendered floor ownership and placement", () => {
     expect(Math.max(Math.abs(bounds!.min.y),Math.abs(bounds!.max.y))*2).toBeCloseTo(0.97,2);
     expect(Math.max(Math.abs(bounds!.min.z),Math.abs(bounds!.max.z))*2).toBeCloseTo(0.19,2);
     const wallCourses=new Map<string,number[]>();
-    for(let i=0;i<masonry[0].count;i++){
-      masonry[0].getMatrixAt(i,point);
+    for(const mesh of masonry)for(let i=0;i<mesh.count;i++){
+      mesh.getMatrixAt(i,point);
       const e=point.elements, isXWall=Math.abs(e[0])<0.001;
       const lineKey=`${isXWall?"x":"z"}:${(isXWall?e[12]:e[14]).toFixed(3)}:${e[13].toFixed(3)}`;
       const along=isXWall?e[14]:e[12];
@@ -77,14 +88,21 @@ describe("rendered floor ownership and placement", () => {
     masonry[0].geometry.computeBoundingBox();
     const stoneBounds=masonry[0].geometry.boundingBox!;
     let wallBottom=Infinity,wallTop=-Infinity;
-    for(let i=0;i<masonry[0].count;i++){
-      masonry[0].getMatrixAt(i,point);
+    for(const mesh of masonry)for(let i=0;i<mesh.count;i++){
+      mesh.getMatrixAt(i,point);
       const halfHeight=Math.max(Math.abs(stoneBounds.min.y),Math.abs(stoneBounds.max.y))*Math.abs(point.elements[5]);
       wallBottom=Math.min(wallBottom,point.elements[13]-halfHeight);
       wallTop=Math.max(wallTop,point.elements[13]+halfHeight);
     }
     expect(wallTop-wallBottom).toBeGreaterThan(2.8);
-    expect(masonry[0].count).toBeGreaterThan(100);
+    expect(masonry.reduce((total,mesh)=>total+mesh.count,0)).toBeGreaterThan(100);
+    const camera=new PerspectiveCamera(70,1,0.1,24);
+    const first=masonry[0].boundingSphere!;
+    const target=first.center.clone();camera.position.copy(target).add(new Vector3(0,2,6));camera.lookAt(target);camera.updateMatrixWorld();camera.updateProjectionMatrix();
+    const frustum=new Frustum().setFromProjectionMatrix(new Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse));
+    const visibleChunks=masonry.filter(mesh=>{mesh.updateMatrixWorld(true);return frustum.intersectsObject(mesh);});
+    expect(visibleChunks.length).toBeGreaterThan(0);
+    expect(visibleChunks.length).toBeLessThan(masonry.length);
     const mortar=floor.root.children.find((item:any)=>item.geometry?.parameters?.width===1&&item.geometry?.parameters?.height===1&&item.geometry?.parameters?.depth===1) as any;
     expect(mortar.count).toBeGreaterThan(0);
     for(const mesh of masonry){

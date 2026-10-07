@@ -72,3 +72,7 @@ Exact source SHA-256 manifest: `/tmp/cryptkeep-art02-source.json`. The manifest 
 ```
 
 Orchestrator validation: full 171 application tests and 7 verification-tool cases pass. Hosted browser checks and visual review pending.
+
+## Round 2 performance repair
+
+Round 2 reduces the shared rounded-stone geometry to 224 indexed vertices / 444 triangles per stone and spatially batches stones in 8m chunks for frustum culling. The `floor-render-contract` fixture contains 1,716 stones in 57 chunks (dimension-derived upper bound 64). A local pure module 25-cycle measurement took 838ms total (316ms generation, 471ms construction, 3ms disposal); this does not diagnose the prior hosted browser failures or establish an FPS result. Typecheck, 173 app tests plus tooling verification, production build, and diff check pass. Hosted 25-case verification and exact-snapshot screenshots remain pending; local E2E was not run due loopback restrictions. Full round-2 details: `progress/CK-ART-02.round-2-fix.md`; exact source hashes: `/tmp/cryptkeep-art02-repaired-r2.json`.

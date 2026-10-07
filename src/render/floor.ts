@@ -3,7 +3,7 @@ import {
   Color, MeshStandardMaterial, OctahedronGeometry, PointLight, Shape, Vector3, BufferGeometry,
   TubeGeometry, CatmullRomCurve3, Path,
 } from "three";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import type { RoleFloorPlan, SpawnPadKind } from "../dungeon/roles";
 import { Tile } from "../dungeon/types";
 import { validateFloor } from "../dungeon/validate";
@@ -12,10 +12,11 @@ import type { Grid } from "../dungeon/types";
 
 export const FLOOR_CELL_METERS = 2;
 export const FLOOR_WALL_HEIGHT = 3;
+export const MASONRY_CHUNK_METERS = 8;
 export interface RenderedFloorOptions { readonly ceilingVisible?: boolean }
 export interface RenderedFloor {
   readonly root: Group;
-  readonly counts: Readonly<{ geometries: number; instances: number; markers: number }>;
+  readonly counts: Readonly<{ geometries: number; instances: number; markers: number; masonryChunks: number }>;
   dispose(): void;
 }
 
@@ -43,6 +44,7 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
   const meshes: InstancedMesh[] = [];
   const ownedMaterials: MeshStandardMaterial[] = [];
   const lights: PointLight[] = [];
+  let masonryChunkCount=0;
   let disposed = false;
   const addInstances = (geometry: BoxGeometry | ConeGeometry | CylinderGeometry | OctahedronGeometry, material: MaterialLibrary["materials"][keyof MaterialLibrary["materials"]], positions: readonly { x:number;y:number;z:number; sx?:number;sy?:number;sz?:number }[], visible = true) => {
     geometries.add(geometry);
@@ -89,17 +91,22 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
       });
       mortar.instanceMatrix.needsUpdate=true; mortar.computeBoundingSphere(); root.add(mortar); meshes.push(mortar);
     }
-    // The 0.90m rounded face plus a narrow four-segment 0.035m bevel gives a fixed 0.97m footprint.
+    // The 0.90m rounded face plus a narrow three-segment 0.035m bevel gives a fixed 0.97m footprint.
     // Two stones occupy each 2m module: 0.03m mortar remains within and across tile boundaries.
-    const masonry = new ExtrudeGeometry(blockShape, { depth: 0.10, bevelEnabled: true, bevelSegments: 4, steps: 1, bevelSize: 0.035, bevelThickness: 0.045, curveSegments: 5 });
-    masonry.translate(0, 0, -0.05);
-    masonry.computeBoundingBox();
-    const stoneBounds=masonry.boundingBox!;
-    const stonePositions=masonry.getAttribute("position"), stoneUv=masonry.getAttribute("uv");
+    const stoneSurface = new ExtrudeGeometry(blockShape, { depth: 0.10, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: 0.035, bevelThickness: 0.045, curveSegments: 3 });
+    stoneSurface.translate(0, 0, -0.05);
+    stoneSurface.computeBoundingBox();
+    const stoneBounds=stoneSurface.boundingBox!;
+    const stonePositions=stoneSurface.getAttribute("position"), stoneUv=stoneSurface.getAttribute("uv");
     for(let vertex=0;vertex<stonePositions.count;vertex++) stoneUv.setXY(vertex,
       (stonePositions.getX(vertex)-stoneBounds.min.x)/(stoneBounds.max.x-stoneBounds.min.x),
       (stonePositions.getY(vertex)-stoneBounds.min.y)/(stoneBounds.max.y-stoneBounds.min.y));
     stoneUv.needsUpdate=true;
+    // Weld duplicate triangle vertices before recomputing normals: this preserves UV seams while
+    // sharing positions and creates smooth bevel/corner normals on one indexed geometry.
+    stoneSurface.deleteAttribute("normal");
+    const masonry=mergeVertices(stoneSurface,1e-4);
+    stoneSurface.dispose();
     masonry.computeVertexNormals();
     const blocks: Array<{x:number;y:number;z:number;yaw:number}>=[];
     for(const edge of wallX)for(let row=0;row<3;row++)for(let half=0;half<2;half++){
@@ -113,15 +120,24 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
     const masonryMaterial=new MeshStandardMaterial({map:library.textures.stone,color:0xffffff,roughness:0.92,metalness:0,emissive:0x10201f,emissiveIntensity:0.12});
     ownedMaterials.push(masonryMaterial);
     if(blocks.length){
-      const mesh=new InstancedMesh(masonry,masonryMaterial,blocks.length);
       geometries.add(masonry);
-      blocks.forEach((p,i)=>{
-        matrix.makeRotationY(p.yaw);
-        matrix.scale(new Vector3(1,1,1));
-        matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);
-        mesh.setColorAt(i,new Color(STONE_TONES[(i*7+Math.floor(p.x+p.z))%STONE_TONES.length]));
-      });
-      mesh.name="rounded-stone-course";mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
+      const chunks=new Map<string,typeof blocks>();
+      for(const block of blocks){
+        const cx=Math.floor(block.x/MASONRY_CHUNK_METERS),cz=Math.floor(block.z/MASONRY_CHUNK_METERS),key=`${cx}:${cz}`;
+        const group=chunks.get(key)??[];group.push(block);chunks.set(key,group);
+      }
+      masonryChunkCount=chunks.size;
+      let colorOrdinal=0;
+      for(const [key,chunk] of chunks){
+        const mesh=new InstancedMesh(masonry,masonryMaterial,chunk.length);
+        chunk.forEach((p,i)=>{
+          matrix.makeRotationY(p.yaw);
+          matrix.scale(new Vector3(1,1,1));
+          matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);
+          mesh.setColorAt(i,new Color(STONE_TONES[(colorOrdinal++*7+Math.floor(p.x+p.z))%STONE_TONES.length]));
+        });
+        mesh.name=`rounded-stone-course:${key}`;mesh.frustumCulled=true;mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
+      }
     }
     // The entry-facing wall torch sits in the yaw-zero forward view; one further fixture lights the route.
     const allSconceEdges = [...wallX.map(p=>({...p,face:"x" as const})), ...wallZ.map(p=>({...p,face:"z" as const}))];
@@ -207,7 +223,7 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
     const instances = meshes.reduce((sum, mesh) => sum + mesh.count, 0);
     return {
       root,
-      counts: Object.freeze({ geometries: geometries.size, instances, markers: MARKERS.length }),
+      counts: Object.freeze({ geometries: geometries.size, instances, markers: MARKERS.length, masonryChunks:masonryChunkCount }),
       dispose() {
         if (disposed) return;
         disposed = true;
@@ -248,6 +264,6 @@ export function createRenderedGrid(grid:Grid,library:MaterialLibrary):RenderedFl
     }
     const add=(positions:readonly GridInstance[],material:MaterialLibrary["materials"][keyof MaterialLibrary["materials"]],height:number)=>{if(!positions.length)return; const geo=new BoxGeometry(2,height,2); geometries.add(geo); const mesh=new InstancedMesh(geo,material,positions.length); positions.forEach((p,i)=>{matrix.makeScale(p.sx??1,p.sy??1,p.sz??1);matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);});mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);};
     add(floors,library.materials.floor,.1); add(walls,library.materials.stone,2);
-    return {root,counts:Object.freeze({geometries:geometries.size,instances:meshes.reduce((n,m)=>n+m.count,0),markers:0}),dispose(){if(disposed)return;disposed=true;root.removeFromParent();root.clear();for(const mesh of meshes)mesh.dispose();for(const geo of geometries)geo.dispose();}};
+    return {root,counts:Object.freeze({geometries:geometries.size,instances:meshes.reduce((n,m)=>n+m.count,0),markers:0,masonryChunks:0}),dispose(){if(disposed)return;disposed=true;root.removeFromParent();root.clear();for(const mesh of meshes)mesh.dispose();for(const geo of geometries)geo.dispose();}};
   } catch(error) {root.clear();for(const mesh of meshes)mesh.dispose();for(const geo of geometries)geo.dispose();throw error;}
 }

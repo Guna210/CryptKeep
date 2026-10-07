@@ -17,7 +17,7 @@ function harness(options: FloorSessionOptions = {}) {
 describe("FloorSession", () => {
   it("installs a diagnostic Grid as its own paused world and retires it on generated replacement",async()=>{
     const retired:string[]=[];
-    const {scene,session}=harness({createFloor:floor=>{const root=new Group();return {root,counts:{geometries:0,instances:0,markers:4},dispose(){retired.push("generated");root.removeFromParent();}};},createDiagnosticFloor:grid=>{const root=new Group();return {root,counts:{geometries:0,instances:grid.tiles.length,markers:0},dispose(){retired.push("diagnostic");root.removeFromParent();}};}});
+    const {scene,session}=harness({createFloor:floor=>{const root=new Group();return {root,counts:{geometries:0,instances:0,markers:4,masonryChunks:0},dispose(){retired.push("generated");root.removeFromParent();}};},createDiagnosticFloor:grid=>{const root=new Group();return {root,counts:{geometries:0,instances:grid.tiles.length,markers:0,masonryChunks:0},dispose(){retired.push("diagnostic");root.removeFromParent();}};}});
     const grid=createGrid(9,9,Array(81).fill(Tile.Walkable));
     session.installDiagnosticGrid(grid);
     expect(session.snapshot()).toMatchObject({worldKind:"diagnostic",width:9,height:9,diagnosticGrid:grid,floorSeed:null,floorNumber:null,contentHash:null,roleMarkers:null,lifecycle:"paused"});
@@ -31,7 +31,7 @@ describe("FloorSession", () => {
     const disposed: number[] = [];
     const { scene, session } = harness({ createFloor: (floor) => {
       const root = new Group();
-      return { root, counts: { geometries: 0, instances: 0, markers: 4 }, dispose: vi.fn(() => { disposed.push(floor.plan.floorNumber); root.removeFromParent(); }) };
+      return { root, counts: { geometries: 0, instances: 0, markers: 4, masonryChunks: 0 }, dispose: vi.fn(() => { disposed.push(floor.plan.floorNumber); root.removeFromParent(); }) };
     } });
     const events: string[] = [];
     session.subscribe((batch) => events.push(...batch.map((event) => event.type)));
@@ -75,7 +75,7 @@ describe("FloorSession", () => {
       createLibrary: () => library,
       createFloor: (floor) => {
         const root = new Group();
-        return { root, counts: { geometries: 0, instances: 0, markers: 4 }, dispose: vi.fn(() => { floorDisposals.push(floor.plan.floorNumber); root.removeFromParent(); }) };
+        return { root, counts: { geometries: 0, instances: 0, markers: 4, masonryChunks: 0 }, dispose: vi.fn(() => { floorDisposals.push(floor.plan.floorNumber); root.removeFromParent(); }) };
       },
     });
     const readyObserver = vi.fn(() => { throw new Error("ready observer failed"); });
@@ -107,7 +107,7 @@ describe("FloorSession", () => {
       createLibrary: () => library,
       createFloor: () => {
         const root = new Group();
-        return { root, counts: { geometries: 0, instances: 0, markers: 4 }, dispose: vi.fn(() => { floorDispose(); root.removeFromParent(); }) };
+        return { root, counts: { geometries: 0, instances: 0, markers: 4, masonryChunks: 0 }, dispose: vi.fn(() => { floorDispose(); root.removeFromParent(); }) };
       },
     });
     const delivered: string[] = [];
