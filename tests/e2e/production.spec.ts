@@ -19,6 +19,10 @@ test("production entry shows painted dungeon masonry and the complete torch at d
   await page.setViewportSize({width:1280,height:800});
   await page.goto("/");
   await expect(page.getByText("Floor 1 · Seed cryptkeep-preview")).toBeVisible();
+  await expect(page.getByText("DUNGEON PREVIEW")).toBeVisible();
+  expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
+  mkdirSync("test-results/CK-ART-03",{recursive:true});
+  await page.screenshot({path:"test-results/CK-ART-03/default-entry.png"});
   const explore=page.getByRole("button",{name:"Explore dungeon"});
   const exploreBox=await explore.boundingBox();
   expect(exploreBox).not.toBeNull();
@@ -37,11 +41,12 @@ test("production entry shows painted dungeon masonry and the complete torch at d
   expect(initial.width*initial.height).toBeLessThanOrEqual(2_400_000);
   expect(initial.antialias).toBe(true);
   expect(initial.imageRendering).not.toBe("pixelated");
-  mkdirSync("test-results/CK-ART-02",{recursive:true});
-  await page.screenshot({path:"test-results/CK-ART-02/production-entry-yaw-0.png"});
-  // Pointer lock retains the explore-click location; move left from there by 100px (~0.20 rad).
+  // Pointer lock retains the Explore click location; make a bounded, known mouse delta.
   await page.mouse.move(clickX-100,clickY,{steps:5});
-  await page.screenshot({path:"test-results/CK-ART-02/production-entry-angle-native-mouse.png"});
+  await page.screenshot({path:"test-results/CK-ART-03/native-room-angle.png"});
+  await page.mouse.move(clickX-100,clickY+58,{steps:4});
+  await page.screenshot({path:"test-results/CK-ART-03/sword-stone-detail.png"});
+  expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
   await page.setViewportSize({width:900,height:600});
   await expect.poll(()=>canvas.evaluate((element:HTMLCanvasElement)=>element.width/element.height)).toBeCloseTo(1.5,2);
   const resized=await canvas.evaluate((element:HTMLCanvasElement)=>({width:element.width,height:element.height}));

@@ -1,6 +1,6 @@
 import {
   BoxGeometry, ConeGeometry, CylinderGeometry, ExtrudeGeometry, Group, InstancedMesh, Matrix4, PlaneGeometry,
-  Color, MeshStandardMaterial, OctahedronGeometry, PointLight, Shape, Vector3, BufferGeometry,
+  Color, Mesh, MeshStandardMaterial, OctahedronGeometry, PointLight, Shape, Vector3, BufferGeometry,
   TubeGeometry, CatmullRomCurve3, Path,
 } from "three";
 import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
@@ -12,7 +12,7 @@ import type { Grid } from "../dungeon/types";
 
 export const FLOOR_CELL_METERS = 2;
 export const FLOOR_WALL_HEIGHT = 3;
-export const MASONRY_CHUNK_METERS = 8;
+export const MASONRY_CHUNK_METERS = 32;
 export interface RenderedFloorOptions { readonly ceilingVisible?: boolean }
 export interface RenderedFloor {
   readonly root: Group;
@@ -42,6 +42,7 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
   const root = new Group();
   const geometries = new Set<BufferGeometry>();
   const meshes: InstancedMesh[] = [];
+  const decorMeshes: Mesh[] = [];
   const ownedMaterials: MeshStandardMaterial[] = [];
   const lights: PointLight[] = [];
   let masonryChunkCount=0;
@@ -105,22 +106,27 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
     // Weld duplicate triangle vertices before recomputing normals: this preserves UV seams while
     // sharing positions and creates smooth bevel/corner normals on one indexed geometry.
     stoneSurface.deleteAttribute("normal");
-    const masonry=mergeVertices(stoneSurface,1e-4);
+    const masonryBase=mergeVertices(stoneSurface,1e-4);
     stoneSurface.dispose();
-    masonry.computeVertexNormals();
-    const blocks: Array<{x:number;y:number;z:number;yaw:number}>=[];
+    masonryBase.computeVertexNormals();
+    const masonryVariants=Array.from({length:4},(_,variant)=>{
+      const geometry=masonryBase.clone(),uv=geometry.getAttribute("uv");
+      for(let i=0;i<uv.count;i++)uv.setXY(i,((variant%2)+uv.getX(i))/2,(Math.floor(variant/2)+uv.getY(i))/2);
+      uv.needsUpdate=true;geometry.computeBoundingBox();return geometry;
+    });
+    masonryBase.dispose();
+    const blocks: Array<{x:number;y:number;z:number;yaw:number;variant:number}>=[];
     for(const edge of wallX)for(let row=0;row<3;row++)for(let half=0;half<2;half++){
       const along=edge.z+(half?0.5:-0.5);
-      blocks.push({x:edge.x,y:0.5+row,z:along,yaw:Math.PI/2});
+      blocks.push({x:edge.x,y:0.5+row,z:along,yaw:Math.PI/2,variant:Math.abs(Math.floor(edge.x*3+along*7+row*5))%4});
     }
     for(const edge of wallZ)for(let row=0;row<3;row++)for(let half=0;half<2;half++){
       const along=edge.x+(half?0.5:-0.5);
-      blocks.push({x:along,y:0.5+row,z:edge.z,yaw:0});
+      blocks.push({x:along,y:0.5+row,z:edge.z,yaw:0,variant:Math.abs(Math.floor(along*3+edge.z*7+row*5))%4});
     }
     const masonryMaterial=new MeshStandardMaterial({map:library.textures.stone,color:0xffffff,roughness:0.92,metalness:0,emissive:0x10201f,emissiveIntensity:0.12});
     ownedMaterials.push(masonryMaterial);
     if(blocks.length){
-      geometries.add(masonry);
       const chunks=new Map<string,typeof blocks>();
       for(const block of blocks){
         const cx=Math.floor(block.x/MASONRY_CHUNK_METERS),cz=Math.floor(block.z/MASONRY_CHUNK_METERS),key=`${cx}:${cz}`;
@@ -129,14 +135,16 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
       masonryChunkCount=chunks.size;
       let colorOrdinal=0;
       for(const [key,chunk] of chunks){
-        const mesh=new InstancedMesh(masonry,masonryMaterial,chunk.length);
-        chunk.forEach((p,i)=>{
-          matrix.makeRotationY(p.yaw);
-          matrix.scale(new Vector3(1,1,1));
-          matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);
-          mesh.setColorAt(i,new Color(STONE_TONES[(colorOrdinal++*7+Math.floor(p.x+p.z))%STONE_TONES.length]));
-        });
-        mesh.name=`rounded-stone-course:${key}`;mesh.frustumCulled=true;mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
+        for(let variant=0;variant<4;variant++){
+          const selected=chunk.filter((block)=>block.variant===variant);if(!selected.length)continue;
+          const geometry=masonryVariants[variant]!;geometries.add(geometry);
+          const mesh=new InstancedMesh(geometry,masonryMaterial,selected.length);
+          selected.forEach((p,i)=>{
+            matrix.makeRotationY(p.yaw);matrix.scale(new Vector3(1,1,1));matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);
+            mesh.setColorAt(i,new Color(STONE_TONES[(colorOrdinal++*7+Math.floor(p.x+p.z))%STONE_TONES.length]));
+          });
+          mesh.name=`rounded-stone-course:${key}:paint-${variant}`;mesh.frustumCulled=true;mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
+        }
       }
     }
     // The entry-facing wall torch sits in the yaw-zero forward view; one further fixture lights the route.
@@ -150,10 +158,10 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
     if (sconceEdges.length) {
       const flameMaterial = new MeshStandardMaterial({ color:0xff9b3f, emissive:0xff5a18, emissiveIntensity:1.15, roughness:0.8 });
       const coreMaterial = new MeshStandardMaterial({ color:0xffe89a, emissive:0xffbd45, emissiveIntensity:1.0, roughness:0.8 });
-      const ironMaterial = new MeshStandardMaterial({ color:0x344147, roughness:0.76, metalness:0.62 });
-      const woodMaterial = new MeshStandardMaterial({ color:0x76513a, roughness:0.96, metalness:0 });
-      const wrapMaterial = new MeshStandardMaterial({ color:0xc39a5e, roughness:0.9, metalness:0.08 });
-      ownedMaterials.push(flameMaterial,coreMaterial,ironMaterial,woodMaterial,wrapMaterial);
+      const ironMaterial = library.materials.iron as MeshStandardMaterial;
+      const woodMaterial = library.materials.wood as MeshStandardMaterial;
+      const wrapMaterial = library.materials.leather as MeshStandardMaterial;
+      ownedMaterials.push(flameMaterial,coreMaterial);
       const flameShape=new Shape();
       flameShape.moveTo(0,.012);flameShape.quadraticCurveTo(-.13,.16,-.12,.30);flameShape.quadraticCurveTo(-.12,.43,-.055,.53);flameShape.quadraticCurveTo(-.022,.58,0,.60);
       flameShape.quadraticCurveTo(.022,.58,.055,.53);flameShape.quadraticCurveTo(.12,.43,.12,.30);flameShape.quadraticCurveTo(.13,.16,0,.012);flameShape.closePath();
@@ -193,6 +201,17 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
         const light=new PointLight(0xffb25c,12,7,1.8); light.position.set(x+normalX*.13,2.53,z+normalZ*.13); root.add(light); lights.push(light);
       });
       for(const [mesh,name] of [[iron,"torch-iron-mount"],[shaft,"torch-wood-shaft"],[wrap,"torch-head-wrap"],[flameMesh,"torch-orange-flame"],[coreMesh,"torch-yellow-core"]] as const){mesh.name=name;mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);}
+      const jambGeometry=new BoxGeometry(.12,2.54,.12), lintelGeometry=new BoxGeometry(.82,.14,.12);
+      geometries.add(jambGeometry);geometries.add(lintelGeometry);
+      const jambs=new InstancedMesh(jambGeometry,library.materials.trim as MeshStandardMaterial,sconceEdges.length*2);
+      const lintels=new InstancedMesh(lintelGeometry,library.materials.trim as MeshStandardMaterial,sconceEdges.length);
+      sconceEdges.forEach((edge,i)=>{
+        const nx=edge.face==="x"?(edge.normalX??0):0,nz=edge.face==="z"?(edge.normalZ??0):0,x=edge.x+nx*.16,z=edge.z+nz*.16;
+        for(const side of [-1,1]){matrix.makeTranslation(x+(edge.face==="z"?side*.39:0),1.42,z+(edge.face==="x"?side*.39:0));jambs.setMatrixAt(i*2+(side===1?1:0),matrix);}
+        matrix.makeTranslation(x,2.68,z);lintels.setMatrixAt(i,matrix);
+      });
+      jambs.name="torch-alcove-jambs";lintels.name="torch-alcove-lintels";
+      for(const trim of [jambs,lintels]){trim.instanceMatrix.needsUpdate=true;trim.computeBoundingSphere();root.add(trim);meshes.push(trim);}
     }
     const mossEdges=[...wallX.map(p=>({...p,face:"x" as const})),...wallZ.map(p=>({...p,face:"z" as const}))]
       .filter((_,i)=>i%5===2).slice(0,16);
@@ -208,6 +227,26 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
         mossMesh.setColorAt(i,new Color(i%2?0x6d805f:0x78866b));
       });
       mossMesh.instanceMatrix.needsUpdate=true; mossMesh.computeBoundingSphere(); root.add(mossMesh); meshes.push(mossMesh);
+    }
+
+    const courseEdges=[...wallX.map(p=>({...p,face:"x" as const})),...wallZ.map(p=>({...p,face:"z" as const}))];
+    if(courseEdges.length){
+      const courseGeometry=new BoxGeometry(2,.16,.14);geometries.add(courseGeometry);
+      const course=new InstancedMesh(courseGeometry,library.materials.trim as MeshStandardMaterial,courseEdges.length);
+      courseEdges.forEach((edge,i)=>{matrix.makeRotationY(edge.face==="x"?Math.PI/2:0);matrix.setPosition(edge.x,.10,edge.z);course.setMatrixAt(i,matrix);});
+      course.name="painted-stone-base-course";course.instanceMatrix.needsUpdate=true;course.computeBoundingSphere();root.add(course);meshes.push(course);
+    }
+
+    const entryRoom=plan.rooms.find((room)=>room.id===plan.roles.entryRoomId);
+    if(entryRoom){
+      const r=entryRoom.rect,cx=(r.x+1)*2+.58,cz=(r.z+1)*2+.52;
+      const crate=new Mesh(new BoxGeometry(.76,.58,.66),library.materials.wood as MeshStandardMaterial);
+      crate.position.set(cx,.31,cz);crate.name="entry-worn-crate";root.add(crate);decorMeshes.push(crate);geometries.add(crate.geometry);
+      const rim=new Mesh(new BoxGeometry(.82,.09,.72),library.materials.trim as MeshStandardMaterial);
+      rim.position.set(cx,.61,cz);rim.name="crate-worn-rim";root.add(rim);decorMeshes.push(rim);geometries.add(rim.geometry);
+      const barrel=new Mesh(new CylinderGeometry(.31,.36,.83,12,1),library.materials.wood as MeshStandardMaterial);
+      barrel.position.set((r.x+r.width-1)*2+.36,.42,(r.z+1)*2+.52);barrel.name="entry-ironbound-barrel";root.add(barrel);decorMeshes.push(barrel);geometries.add(barrel.geometry);
+      for(const y of [.18,.68]){const hoop=new Mesh(new CylinderGeometry(.365,.365,.065,12,1),library.materials.iron as MeshStandardMaterial);hoop.position.copy(barrel.position);hoop.position.y=y;hoop.name="barrel-iron-hoop";root.add(hoop);decorMeshes.push(hoop);geometries.add(hoop.geometry);}
     }
 
     const markerGeometry = {
@@ -231,6 +270,7 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
         root.clear();
         for (const mesh of meshes) mesh.dispose();
         for (const geometry of geometries) geometry.dispose();
+        for (const mesh of decorMeshes) mesh.dispatchEvent({ type:"dispose" });
         for (const material of ownedMaterials) material.dispose();
         lights.length=0;
         meshes.length = 0; geometries.clear();
@@ -240,6 +280,7 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
     root.removeFromParent(); root.clear();
     for (const mesh of meshes) mesh.dispose();
     for (const geometry of geometries) geometry.dispose();
+    for (const mesh of decorMeshes) mesh.dispatchEvent({ type:"dispose" });
     for (const material of ownedMaterials) material.dispose();
     throw error;
   }

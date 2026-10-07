@@ -188,6 +188,8 @@ test("swept movement stops at a generated wall with the full player circle clear
   await page.keyboard.down("w");
   await page.keyboard.down("Shift");
   await expect.poll(async () => (await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!)).lastSample?.held.includes("sprint")).toBe(true);
+  const refillStartTick=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick);
+  await expect.poll(()=>page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick),{timeout:10000}).toBeGreaterThanOrEqual(refillStartTick+45);
   await expect.poll(async () => (await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!)).resources!.stamina.current, {timeout:5000}).toBe(100);
   const heldAtWall = await page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!);
   await page.waitForTimeout(150);

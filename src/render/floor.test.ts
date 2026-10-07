@@ -41,15 +41,20 @@ describe("rendered floor ownership and placement", () => {
     expect(ceilingCenters).toEqual(actual);
     expect(floor.counts.markers).toBe(4);
     expect(floor.counts.instances).toBeGreaterThan(floors.count * 2);
-    expect(floor.root.children.length).toBeLessThanOrEqual(15+floor.counts.masonryChunks); // fixed batches plus spatial masonry chunks
+    expect(floor.root.children.length).toBeLessThanOrEqual(23+floor.counts.masonryChunks*4); // four atlas selections per spatial batch plus room dressing
     const wallMeshes = floor.root.children.filter((item: any) => item.material === library.materials.stone) as any[];
     expect(wallMeshes).toHaveLength(1); // ceiling retains the shared stone library material
     const masonry=floor.root.children.filter((item:any)=>item.name?.startsWith("rounded-stone-course:")) as any[];
-    expect(masonry).toHaveLength(floor.counts.masonryChunks);
-    expect(masonry.length).toBeGreaterThan(1);
+    expect(masonry.length).toBeGreaterThanOrEqual(floor.counts.masonryChunks);
+    expect(masonry.length).toBeLessThanOrEqual(floor.counts.masonryChunks*4);
+    expect(new Set(masonry.map(mesh=>mesh.name.split(":").at(-1))).size).toBeGreaterThanOrEqual(3);
     expect(masonry.every(mesh=>mesh.count>0&&mesh.instanceColor!==null)).toBe(true);
     expect(masonry.every(mesh=>mesh.frustumCulled)).toBe(true);
-    expect(masonry.every(mesh=>mesh.geometry===masonry[0].geometry&&mesh.material===masonry[0].material)).toBe(true);
+    expect(masonry.every(mesh=>mesh.material===masonry[0].material)).toBe(true);
+    for(const variant of new Set(masonry.map(mesh=>mesh.name.split(":").at(-1)))){
+      const batches=masonry.filter(mesh=>mesh.name.endsWith(`:${variant}`));
+      expect(batches.every(mesh=>mesh.geometry===batches[0].geometry)).toBe(true);
+    }
     expect(masonry[0].material.map).toBe(library.textures.stone);
     expect(masonry[0].geometry.index).not.toBeNull();
     expect(masonry[0].geometry.attributes.position.count).toBeLessThan(800);
@@ -64,8 +69,9 @@ describe("rendered floor ownership and placement", () => {
     const faceUv=masonry[0].geometry.attributes.uv;
     expect(Math.min(...faceUv.array)).toBeGreaterThanOrEqual(-1e-6);
     expect(Math.max(...faceUv.array)).toBeLessThanOrEqual(1+1e-6);
-    expect(Math.min(...faceUv.array)).toBeCloseTo(0,5);
-    expect(Math.max(...faceUv.array)).toBeCloseTo(1,5);
+    expect(Math.min(...faceUv.array)).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...faceUv.array)).toBeLessThanOrEqual(1);
+    expect(Math.max(...masonry.map(mesh=>Math.max(...mesh.geometry.attributes.uv.array)))).toBeGreaterThan(.5);
     expect(masonry[0].material.emissiveIntensity).toBeLessThan(0.2);
     if(!masonry[0].geometry.boundingBox) masonry[0].geometry.computeBoundingBox();
     const bounds=masonry[0].geometry.boundingBox;
@@ -127,7 +133,7 @@ describe("rendered floor ownership and placement", () => {
     expect(floor.root.children.filter((item:any)=>item.type==="PointLight").length).toBeGreaterThan(0);
     expect(floor.root.children.filter((item:any)=>item.type==="PointLight").length).toBeLessThanOrEqual(2);
     expect(floor.root.children.filter((item:any)=>item.name?.startsWith("torch-")).map((item:any)=>item.name)).toEqual([
-      "torch-iron-mount","torch-wood-shaft","torch-head-wrap","torch-orange-flame","torch-yellow-core",
+      "torch-iron-mount","torch-wood-shaft","torch-head-wrap","torch-orange-flame","torch-yellow-core","torch-alcove-jambs","torch-alcove-lintels",
     ]);
     const outer=floor.root.children.find((item:any)=>item.name==="torch-orange-flame") as any;
     const core=floor.root.children.find((item:any)=>item.name==="torch-yellow-core") as any;

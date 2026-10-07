@@ -1,7 +1,9 @@
 import {
   BoxGeometry, BufferGeometry, CylinderGeometry, Euler, ExtrudeGeometry, Group, Mesh, MeshStandardMaterial,
-  Quaternion, Shape, SphereGeometry, Vector3, CatmullRomCurve3, TubeGeometry,
+  Quaternion, Shape, SphereGeometry, Vector3, CatmullRomCurve3, TubeGeometry, DataTexture, RGBAFormat,
+  UnsignedByteType, SRGBColorSpace, LinearFilter, LinearMipmapLinearFilter,
 } from "three";
+import { createPaintedArtwork } from "../textures/painted";
 import type { WorldRenderer } from "../renderer";
 import type { SwordState } from "../../weapons/sword";
 
@@ -61,11 +63,18 @@ export function getSwordPose(state: SwordState): SwordPose {
 export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camera">): SwordViewmodel {
   const root = new Group();
   root.name = "sword-viewmodel";
-  const bladeMaterial = new MeshStandardMaterial({ color: 0xa9c7c8, roughness: 0.3, metalness: 0.78, emissive: 0x000000 });
-  const leatherMaterial = new MeshStandardMaterial({ color: 0x30231d, roughness: 0.92, metalness: 0 });
-  const goldMaterial = new MeshStandardMaterial({ color: 0xc9924e, roughness: 0.38, metalness: 0.7 });
-  const wrapMaterial = new MeshStandardMaterial({ color: 0x6f5844, roughness: 0.96, metalness: 0.02 });
-  const glowMaterial = new MeshStandardMaterial({ color: 0xffc56c, roughness: 0.4, metalness: 0.18, emissive: 0x000000 });
+  const ownedTextures = ["steel", "leather", "brass"].map((kind) => {
+    const art = createPaintedArtwork(kind as "steel" | "leather" | "brass", 128);
+    const texture = new DataTexture(art.data, art.width, art.height, RGBAFormat, UnsignedByteType);
+    texture.colorSpace=SRGBColorSpace; texture.magFilter=LinearFilter; texture.minFilter=LinearMipmapLinearFilter;
+    texture.generateMipmaps=true; texture.needsUpdate=true; return texture;
+  });
+  const [steelTexture, leatherTexture, brassTexture] = ownedTextures;
+  const bladeMaterial = new MeshStandardMaterial({ map:steelTexture, color:0xe3eeee, roughness:0.47, metalness:0.22, emissive:0x18282d, emissiveIntensity:0.12 });
+  const leatherMaterial = new MeshStandardMaterial({ map:leatherTexture, color:0xd2b39a, roughness:0.92, metalness:0 });
+  const goldMaterial = new MeshStandardMaterial({ map:brassTexture, color:0xf2dfb1, roughness:0.52, metalness:0.2 });
+  const wrapMaterial = new MeshStandardMaterial({ map:leatherTexture, color:0xe0c5a6, roughness:0.96, metalness:0.02 });
+  const glowMaterial = new MeshStandardMaterial({ map:steelTexture, color:0xffd78a, roughness:0.48, metalness:0.12, emissive:0x000000 });
   const geometries: BufferGeometry[] = [];
   const materials = [bladeMaterial, leatherMaterial, goldMaterial, wrapMaterial, glowMaterial];
   const mesh = (geometry: BufferGeometry, material: MeshStandardMaterial, name: string) => {
@@ -81,6 +90,16 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
   bladeShape.quadraticCurveTo(0.058,0.31,0.052,0.02); bladeShape.closePath();
   const bladeGeometry = new ExtrudeGeometry(bladeShape, { depth: 0.075, bevelEnabled: true, bevelSegments: 4, steps: 1, bevelSize: 0.018, bevelThickness: 0.018, curveSegments: 8 });
   bladeGeometry.computeVertexNormals();
+  // Hand-authored UV panels: front (0–.50), reverse (0.52–.68), and narrow edge (0.72–.98).
+  const bladeUv=bladeGeometry.getAttribute("uv"), bladePos=bladeGeometry.getAttribute("position"), bladeNorm=bladeGeometry.getAttribute("normal");
+  const bounds=bladeGeometry.boundingBox ?? (bladeGeometry.computeBoundingBox(),bladeGeometry.boundingBox!);
+  for(let i=0;i<bladeUv.count;i++){
+    const x=(bladePos.getX(i)-bounds.min.x)/(bounds.max.x-bounds.min.x), y=(bladePos.getY(i)-bounds.min.y)/(bounds.max.y-bounds.min.y);
+    const front=Math.abs(bladeNorm.getZ(i))>.72;
+    const region=front?(bladeNorm.getZ(i)>0?[.035,.49]:[.515,.67]):[.73,.96];
+    bladeUv.setXY(i,region[0]!+x*(region[1]!-region[0]!),.035+y*.93);
+  }
+  bladeUv.needsUpdate=true;
   bladeGeometry.translate(0, 0, -0.0375);
   const blade = mesh(bladeGeometry, bladeMaterial, "soft-edged-steel-blade");
   blade.position.z = 0.01;
@@ -141,6 +160,7 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
       root.clear();
       for (const geometry of geometries) geometry.dispose();
       for (const material of materials) material.dispose();
+      for (const texture of ownedTextures) texture.dispose();
     },
   };
 }

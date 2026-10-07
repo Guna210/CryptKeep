@@ -56,12 +56,12 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
           compression-level: 6
-      - name: Upload CK-ART-02 painted cartoon production evidence
+      - name: Upload CK-ART-03 authored painted asset evidence
         if: always() && github.event_name == 'push' && github.ref == 'refs/heads/cartoon-art-preview'
         uses: actions/upload-artifact@v4
         with:
-          name: cryptkeep-cartoon-art-02-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/CK-ART-02/**
+          name: cryptkeep-art-03-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/CK-ART-03/**
           if-no-files-found: ignore
           retention-days: 7
           compression-level: 6

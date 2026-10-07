@@ -2,6 +2,8 @@ import { mkdirSync } from "node:fs";
 import { expect, test } from "../harness/browser";
 
 test("seeded dungeon preview changes floors, recovers from invalid input and keeps one active scene", async ({ page, browserHarness }) => {
+  test.setTimeout(60_000);
+  mkdirSync("test-results/CK-ART-03", { recursive: true });
   await page.addInitScript(() => {
     const active = new Set<EventListenerOrEventListenerObject>();
     const add = HTMLFormElement.prototype.addEventListener;
@@ -60,8 +62,7 @@ test("seeded dungeon preview changes floors, recovers from invalid input and kee
   expect(sceneChildren).toBe(1);
   expect(await page.evaluate(() => (window as Window & { __activeSubmitListeners: number }).__activeSubmitListeners)).toBe(1);
 
-  mkdirSync("test-results/CK-02-05", { recursive: true });
-  await page.screenshot({ path: "test-results/CK-02-05/floor-overview.png", fullPage: true });
+  await page.screenshot({ path: "test-results/CK-ART-03/floor-overview.png", fullPage: true });
   const retainedForm = await page.locator("form").evaluateHandle((element) => element as HTMLFormElement);
   await page.evaluate(() => { window.dispatchEvent(new Event("pagehide")); window.dispatchEvent(new Event("pagehide")); });
   expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
@@ -70,7 +71,7 @@ test("seeded dungeon preview changes floors, recovers from invalid input and kee
   await retainedForm.evaluate((element) => element.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
   browserHarness.assertNoErrors();
-}, { timeout: 60_000 });
+});
 
 test("floor diagnostics are detached and immutable", async ({ page, browserHarness }) => {
   await page.goto("/");

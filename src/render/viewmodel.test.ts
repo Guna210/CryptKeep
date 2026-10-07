@@ -72,7 +72,7 @@ describe("sword viewmodel", () => {
     expect(disposals.every((entry) => entry.geometryDispose.mock.calls.length === 1 && entry.materialDispose.mock.calls.length === 1)).toBe(true);
     expect(owned.every((part)=>{
       const material=(part as Mesh).material as MeshStandardMaterial;
-      return material instanceof MeshStandardMaterial && !material.map;
+      return material instanceof MeshStandardMaterial && material.map !== null;
     })).toBe(true);
     expect(camera.parent).toBeNull();
   });
