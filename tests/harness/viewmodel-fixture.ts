@@ -25,8 +25,8 @@ window.swordFixture = {
   setState(state) { model.update(state); renderer.renderer.render(renderer.scene, renderer.camera); },
   dispose() {
     model.dispose(); model.dispose();
-    const rootRemoved = !renderer.camera.children.includes(model.root);
-      const cameraKept = renderer.camera.parent === cameraParent;
+    const rootRemoved = !renderer.scene.children.includes(model.root);
+    const cameraKept = renderer.camera.parent === cameraParent;
     renderer.dispose();
     return { contextLost: context.isContextLost(), cameraKept, rootRemoved };
   },
