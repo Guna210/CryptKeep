@@ -46,7 +46,7 @@ export function createCombatHud(host: HTMLElement, playerId: string, collector: 
         const ratio = safeMax > 0 ? safeCurrent / safeMax : 0;
         const row = document.createElement("div"); row.className = "ck-hud__resource";
         row.dataset.resource = label.toLowerCase();
-        if (label === "HP" && safeMax > 0 && safeCurrent > 0 && ratio <= 0.25) row.classList.add("is-low");
+        if (label === "HP" && safeMax > 0 && ratio <= 0.25) row.classList.add("is-low");
         const text = document.createElement("span"); text.textContent = `${label} ${safeCurrent} / ${safeMax}`;
         const track = document.createElement("div"); track.className = "ck-hud__track"; track.setAttribute("role", "meter"); track.setAttribute("aria-label", `${label} resource`); track.setAttribute("aria-valuemin", "0"); track.setAttribute("aria-valuemax", String(safeMax)); track.setAttribute("aria-valuenow", String(safeCurrent));
         const fill = document.createElement("i"); fill.style.width = `${ratio * 100}%`; track.append(fill); row.append(text, track); return row;

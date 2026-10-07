@@ -10,11 +10,20 @@ test("DEV HUD follows real resources and damage events with bounded caller-time 
   const hp = page.locator('[data-resource="hp"]'), sta = page.locator('[data-resource="sta"]'), mp = page.locator('[data-resource="mp"]');
   await expect(hp).toContainText("HP 100 / 100"); await expect(sta).toContainText("STA 75 / 100"); await expect(mp).toContainText("MP 42 / 60");
   await expect(page.locator(".ck-hud__reticle")).toBeVisible();
+  const reticleCentered = await page.evaluate(() => {
+    const stage = document.querySelector("#stage")!.getBoundingClientRect();
+    const reticle = document.querySelector(".ck-hud__reticle")!.getBoundingClientRect();
+    return Math.abs((reticle.left + reticle.width / 2) - (stage.left + stage.width / 2)) < 1 && Math.abs((reticle.top + reticle.height / 2) - (stage.top + stage.height / 2)) < 1;
+  });
+  expect(reticleCentered).toBe(true);
   await page.getByRole("button", { name: "Toggle charge" }).click();
   await expect(page.locator(".ck-hud__charge")).toBeVisible();
   await expect(page.locator(".ck-hud__charge i")).toHaveAttribute("style", "width: 50%;");
   await page.getByRole("button", { name: "Toggle charge" }).click(); await expect(page.locator(".ck-hud__charge")).toBeHidden();
   await page.getByRole("button", { name: "Low HP" }).click(); await expect(hp).toHaveClass(/is-low/); await expect(hp).toContainText("HP 25 / 100");
+  await page.getByRole("button", { name: "Zero HP" }).click(); await expect(hp).toHaveClass(/is-low/); await expect(hp).toContainText("HP 0 / 100");
+  await page.getByRole("button", { name: "Zero max" }).click(); await expect(mp).toContainText("MP 0 / 0");
+  await page.getByRole("button", { name: "Restore values" }).click(); await expect(hp).toContainText("HP 100 / 100"); await expect(mp).toContainText("MP 42 / 60");
   await page.getByRole("button", { name: "Disable flashes" }).click();
   await page.getByRole("button", { name: "Incoming damage" }).click();
   await expect(hp).toContainText("HP 90 / 100"); await expect(hp).not.toHaveClass(/is-low/);

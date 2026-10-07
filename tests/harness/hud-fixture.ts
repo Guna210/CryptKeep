@@ -37,6 +37,9 @@ document.querySelector("#incoming")!.addEventListener("click", () => {
 document.querySelector("#irrelevant")!.addEventListener("click", () => resolve(enemyIdentity, target, TARGET));
 document.querySelector("#charge")!.addEventListener("click", () => { charging = !charging; snapshot = Object.freeze({ ...snapshot, sword: charging ? chargeState() : createSwordState() }); update(); });
 document.querySelector("#low")!.addEventListener("click", () => { low = !low; snapshot = Object.freeze({ ...snapshot, health: createResource(low ? 25 : 100, 100) }); update(); });
+document.querySelector("#zero-hp")!.addEventListener("click", () => { snapshot = Object.freeze({ ...snapshot, health: createResource(0, 100) }); update(); });
+document.querySelector("#zero-max")!.addEventListener("click", () => { snapshot = Object.freeze({ ...snapshot, mana: createResource(0, 0) }); update(); });
+document.querySelector("#restore")!.addEventListener("click", () => { snapshot = Object.freeze({ ...snapshot, health: createResource(100, 100), mana: createResource(42, 60) }); update(); });
 document.querySelector("#flash")!.addEventListener("click", () => { flashes = !flashes; hud.setDamageFlashesEnabled(flashes); document.querySelector("#flash")!.textContent = flashes ? "Disable flashes" : "Enable flashes"; });
 document.querySelector("#tick")!.addEventListener("click", () => hud.advance(0.26, paused));
 document.querySelector("#freeze")!.addEventListener("click", () => { paused = true; hud.advance(1, true); paused = false; });
