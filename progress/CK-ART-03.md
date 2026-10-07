@@ -33,7 +33,7 @@ Original builder handoff hash records its submitted snapshot; this source-only m
   "task": "CK-ART-03",
   "baseline": "0f771edf92d16f394eed4b259a48bba6a1a5e27b",
   "branch": "cartoon-art-preview",
-  "method": "authored deterministic vector-style TypeScript surface rasterizer; no external/AI assets",
+  "method": "authored deterministic vector-style TypeScript surface rasterizer; no external assets or image-generation service",
   "localVisualEvidence": {
     "path": "test-results/CK-ART-03/contact-sheet.png",
     "bytes": 102869,

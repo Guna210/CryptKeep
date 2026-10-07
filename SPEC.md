@@ -1,4 +1,4 @@
-> Owner asset experiment (2026-10-07): CK-ART-03 on the existing preview branch follows [decisions/painted-asset-preview.md](decisions/painted-asset-preview.md), with Luna implementation and independent review. Cloudflare deployment is automatic; no hosting work.
+> Owner asset experiment (2026-10-07): CK-ART-03 on the existing preview branch follows [decisions/painted-asset-preview.md](decisions/painted-asset-preview.md), with Luna implementation and independent review. Engineering acceptance passed in round 2; [accepted source/evidence](progress/CK-ART-03.acceptance.md). Owner aesthetic approval remains pending. Cloudflare deployment is automatic; no hosting work.
 
 > Owner refinement (2026-10-07): the first cartoon preview was rejected for hard edges, uneven joints and placeholder torches. CK-ART-02 on the same preview branch follows [decisions/cartoon-art-refinement.md](decisions/cartoon-art-refinement.md); no master merge or permanent campaign art adoption is authorized.
 
