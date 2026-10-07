@@ -10,11 +10,11 @@ test("DEV training room renders a real target, damage/death state, and optional 
   const initial = await page.evaluate(() => ({ draws: window.combatRoomFixture.drawCalls(), hits: window.combatRoomFixture.queryTargets().map((hit) => hit.targetId), globals: Object.keys(window).filter((key) => /combatRoom|cryptkeep/i.test(key)) }));
   expect(initial.draws).toBeGreaterThan(0); expect(initial.hits).toEqual(["dev-training-dummy"]);
   expect(initial.globals).toContain("combatRoomFixture");
-  await page.screenshot({ path: "docs/evidence/CK-03-07/training-clear.png" });
+  await page.screenshot({ path: "test-results/CK-03-07/training-clear.png" });
   await page.getByRole("button", { name: "Toggle obstruction" }).click();
   await expect(page.locator("#variant")).toHaveText("OBSTRUCTED");
   expect(await page.evaluate(() => window.combatRoomFixture.queryTargets())).toEqual([]);
-  await page.screenshot({ path: "docs/evidence/CK-03-07/training-obstructed.png" });
+  await page.screenshot({ path: "test-results/CK-03-07/training-obstructed.png" });
   await page.getByRole("button", { name: "Toggle obstruction" }).click();
   expect(await page.evaluate(() => window.combatRoomFixture.queryTargets().length)).toBe(1);
   await page.getByRole("button", { name: "Light 18" }).click();
@@ -24,6 +24,6 @@ test("DEV training room renders a real target, damage/death state, and optional 
   await page.getByRole("button", { name: "Lethal 100" }).click();
   await expect(page.locator("#label")).toContainText("HP 0 / 100 · DEAD");
   expect(await page.evaluate(() => window.combatRoomFixture.queryTargets())).toEqual([]);
-  await page.screenshot({ path: "docs/evidence/CK-03-07/training-dead.png" });
+  await page.screenshot({ path: "test-results/CK-03-07/training-dead.png" });
   expect(pageErrors).toEqual([]); expect(consoleErrors).toEqual([]);
 });
