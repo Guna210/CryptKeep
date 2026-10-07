@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GameCommand, InputEdge } from "../core/commands";
 import { createResource, createResourceRegenTimers } from "../player/resources";
 import { createWeaponRuntime, dispatchWeapon } from "../combat/weapon-dispatch";
-import { createSwordState, SWORD_LIGHT_ACTIVE_SECONDS, SWORD_LIGHT_RECOVERY_SECONDS, SWORD_LIGHT_STAMINA_COST, SWORD_LIGHT_WINDUP_SECONDS, sword, updateSword } from "./sword";
+import { createSwordState, isSwordCharging, SWORD_CHARGE_THRESHOLD_SECONDS, SWORD_FULL_CHARGE_SECONDS, SWORD_HEAVY_ACTIVE_SECONDS, SWORD_HEAVY_MAX_DAMAGE, SWORD_HEAVY_MAX_STAMINA_COST, SWORD_HEAVY_RECOVERY_SECONDS, SWORD_HEAVY_WINDUP_SECONDS, SWORD_LIGHT_ACTIVE_SECONDS, SWORD_LIGHT_RECOVERY_SECONDS, SWORD_LIGHT_STAMINA_COST, SWORD_LIGHT_WINDUP_SECONDS, sword, swordChargeFraction, updateSword } from "./sword";
 import type { WeaponUpdateContext } from "./types";
 
 function command(edges: readonly InputEdge[] = [], cancellations: GameCommand["cancellations"] = []): GameCommand {
@@ -131,5 +131,108 @@ describe("sword tap timing", () => {
 
   it("rejects invalid simulation time as a programmer error", () => {
     for (const dt of [NaN, Infinity, -0.01]) expect(() => updateSword(createSwordState(), command(), context(dt))).toThrow(RangeError);
+  });
+});
+
+describe("sword charge and interruption", () => {
+  function releasedAfter(heldSeconds: number, stamina = createResource(100,100)) {
+    const held = updateSword(createSwordState(), command([press]), context(heldSeconds));
+    return dispatchWeapon({ weapon:sword, state:held.state, command:command([release]), dtSeconds:0, stamina,
+      regenTimers:createResourceRegenTimers(), runtime:createWeaponRuntime(`charge-${heldSeconds}`) });
+  }
+
+  it("uses the exact threshold convention and keeps the light path below it", () => {
+    const below = releasedAfter(SWORD_CHARGE_THRESHOLD_SECONDS - 1e-8);
+    const at = releasedAfter(SWORD_CHARGE_THRESHOLD_SECONDS);
+    const above = releasedAfter(SWORD_CHARGE_THRESHOLD_SECONDS + 1e-8);
+    expect(below.state.committedKind).toBe("sword-light");
+    expect(below.state.committedDamage).toBe(18);
+    expect(below.stamina.current).toBe(90);
+    expect(at.state.committedKind).toBe("sword-heavy");
+    expect(at.state.committedDamage).toBe(30);
+    expect(at.stamina.current).toBe(82);
+    expect(above.state.committedDamage).toBeGreaterThan(30);
+    expect(above.stamina.current).toBeLessThan(82);
+  });
+
+  it("keeps representable durations immediately below the threshold light", () => {
+    for (const heldSeconds of [0.25 - 1e-16, 0.25 - 2e-16]) {
+      const result = releasedAfter(heldSeconds);
+      expect(result.state.committedKind).toBe("sword-light");
+      expect(result.state.committedDamage).toBe(18);
+      expect(result.stamina.current).toBe(90);
+    }
+  });
+
+  it("exposes charge to readers and caps damage, cost, and charge fraction at full power", () => {
+    const initial = updateSword(createSwordState(), command([press]), context(0));
+    const threshold = updateSword(initial.state, command(), context(SWORD_CHARGE_THRESHOLD_SECONDS));
+    expect(isSwordCharging(threshold.state)).toBe(true);
+    expect(swordChargeFraction(threshold.state)).toBe(0);
+    const capped = updateSword(threshold.state, command(), context(4));
+    expect(swordChargeFraction(capped.state)).toBe(1);
+    const result = dispatchWeapon({ weapon:sword, state:capped.state, command:command([release]), dtSeconds:0,
+      stamina:createResource(100,100), regenTimers:createResourceRegenTimers(), runtime:createWeaponRuntime("full-charge") });
+    expect(result.state.committedDamage).toBe(SWORD_HEAVY_MAX_DAMAGE);
+    expect(result.stamina.current).toBe(100 - SWORD_HEAVY_MAX_STAMINA_COST);
+    const onset = dispatchWeapon({ weapon:sword, state:result.state, command:command(), dtSeconds:SWORD_HEAVY_WINDUP_SECONDS,
+      stamina:result.stamina, regenTimers:result.regenTimers, runtime:result.runtime });
+    expect(onset.attacks).toEqual([expect.objectContaining({kind:"sword-heavy",damage:54})]);
+    expect(onset.state.committedTiming).toEqual({windupSeconds:SWORD_HEAVY_WINDUP_SECONDS,activeSeconds:SWORD_HEAVY_ACTIVE_SECONDS,recoverySeconds:SWORD_HEAVY_RECOVERY_SECONDS});
+  });
+
+  it("reaches threshold after 15 ticks and full charge after 72 ticks at 60 Hz", () => {
+    let state = updateSword(createSwordState(), command([press]), context(0)).state;
+    for (let i=0;i<15;i++) state = updateSword(state, command(), context(1/60)).state;
+    expect(state.elapsedSeconds).toBe(0.25);
+    expect(isSwordCharging(state)).toBe(true);
+    expect(swordChargeFraction(state)).toBe(0);
+    for (let i=15;i<72;i++) state = updateSword(state, command(), context(1/60)).state;
+    expect(state.elapsedSeconds).toBe(1.2);
+    expect(swordChargeFraction(state)).toBe(1);
+  });
+
+  it("uses heavy timings and never downgrades a rejected heavy release to light", () => {
+    const short = releasedAfter(0.25);
+    const hit = dispatchWeapon({weapon:sword,state:short.state,command:command(),dtSeconds:SWORD_HEAVY_WINDUP_SECONDS,
+      stamina:short.stamina,regenTimers:short.regenTimers,runtime:short.runtime});
+    expect(hit.attacks[0]).toMatchObject({kind:"sword-heavy",damage:30});
+    const rejected = releasedAfter(0.8, createResource(20,100));
+    expect(rejected.state).toEqual(createSwordState());
+    expect(rejected.stamina.current).toBe(20);
+    expect(rejected.events).toContainEqual(expect.objectContaining({type:"attack-rejected",reason:"insufficient-resource"}));
+    expect(rejected.attacks).toEqual([]);
+  });
+
+  it("carries a heavy attack through all phase boundaries and preserves immutable committed state", () => {
+    const held = updateSword(createSwordState(), command([press]), context(0.25));
+    const committed = dispatchWeapon({weapon:sword,state:held.state,command:command([release]),dtSeconds:0,
+      stamina:createResource(100,100),regenTimers:createResourceRegenTimers(),runtime:createWeaponRuntime("heavy-carry")});
+    expect(Object.isFrozen(committed.state)).toBe(true);
+    expect(Object.isFrozen(committed.state.committedTiming)).toBe(true);
+    const elapsed = dispatchWeapon({weapon:sword,state:committed.state,command:command(),dtSeconds:SWORD_HEAVY_WINDUP_SECONDS+SWORD_HEAVY_ACTIVE_SECONDS+SWORD_HEAVY_RECOVERY_SECONDS,
+      stamina:committed.stamina,regenTimers:committed.regenTimers,runtime:committed.runtime});
+    expect(elapsed.state).toEqual(createSwordState());
+    expect(elapsed.attacks).toHaveLength(1);
+    expect(elapsed.attacks[0]).toMatchObject({kind:"sword-heavy",damage:30});
+  });
+
+  it("cancels an uncommitted hold and an already committed heavy without refund", () => {
+    const held = dispatchWeapon({weapon:sword,state:createSwordState(),command:command([press]),dtSeconds:0.5,
+      stamina:createResource(100,100),regenTimers:createResourceRegenTimers(),runtime:createWeaponRuntime("cancel-hold")});
+    const canceled = dispatchWeapon({weapon:sword,state:held.state,command:command([], ["weapon-switch"]),dtSeconds:0.1,
+      stamina:held.stamina,regenTimers:held.regenTimers,runtime:held.runtime});
+    expect(canceled.state).toEqual(createSwordState());
+    expect(canceled.stamina.current).toBe(100);
+    expect(canceled.attacks).toEqual([]);
+    const committed = dispatchWeapon({weapon:sword,state:createSwordState(),command:command([press]),dtSeconds:0.25,
+      stamina:createResource(100,100),regenTimers:createResourceRegenTimers(),runtime:createWeaponRuntime("cancel-after")});
+    const released = dispatchWeapon({weapon:sword,state:committed.state,command:command([release]),dtSeconds:0,
+      stamina:committed.stamina,regenTimers:committed.regenTimers,runtime:committed.runtime});
+    const after = dispatchWeapon({weapon:sword,state:released.state,command:command([], ["pause"]),dtSeconds:0,
+      stamina:released.stamina,regenTimers:released.regenTimers,runtime:released.runtime});
+    expect(after.state).toEqual(createSwordState());
+    expect(after.stamina.current).toBe(82);
+    expect(after.attacks).toEqual([]);
   });
 });

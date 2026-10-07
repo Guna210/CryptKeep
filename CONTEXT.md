@@ -134,7 +134,7 @@ During future implementation, track active tasks and accepted-task summaries her
 
 ## Immediate next action
 
-Complete authorized M03 in card order CK-03-01 through CK-03-09, respecting dependencies and publishing each accepted task before dependents. CK-03-04 accepted and pushed; next CK-03-05 ready. Do not start M04 or deploy.
+Complete authorized M03 in card order CK-03-01 through CK-03-09, respecting dependencies and publishing each accepted task before dependents. CK-03-05 running. Do not start M04 or deploy.
 
 ## Active M02 continuation
 
@@ -156,3 +156,5 @@ Complete authorized M03 in card order CK-03-01 through CK-03-09, respecting depe
 - CK-03-04 accepted: builder `/root/ck_03_04_builder`, explicit `gpt-6-luna`; baseline `350c1d8cc97b4cfe86cd3be23b5cd72e7612f4a6`. Owns sword.ts/tests/handoff; release-driven light18damage/10stamina, windup0.06s/active0.12s/recovery0.30s, no auto-fire, shared callback commitment and explicit cancellation. Long holds temporarily remain light until CK-03-05; no guard/parry. Round 1 independent reviewer `/root/ck_03_04_reviewer_r1`, explicit `gpt-6-luna`; frozen `/tmp/cryptkeep-CK-03-04-submission.json`. Independent typecheck/app151/tool7/build PASS; three hashes matched and round-one review PASS, no findings or repairs.
 
 - CK-03-03 hosted [receipt run37577722976](https://github.com/Guna210/CryptKeep/actions/runs/37577722976) succeeded on source-identical `350c1d8`. Later browser/visual procedure is recorded in [hosted verification](decisions/M03-hosted-verification.md), orchestrator-authored and publishes with this checkpoint.
+
+- CK-03-05 verifying: builder `/root/ck_03_05_builder`, explicit `gpt-6-luna`; baseline `032a4fd49e460d4f920af101d5efa0a3e8a50546`. Owns sword.ts/tests/handoff; threshold0.25s/full1.2s, heavy30–54damage/18–30stamina, heavywindup0.10/active0.16/recovery0.50 seconds, unchanged light path and once-only cost/hit. Typed charge selectors/state for later visuals/HUD; no guard/parry/main. Round 1 reviewer `/root/ck_03_05_reviewer_r1`, explicit `gpt-6-luna`; frozen `/tmp/cryptkeep-CK-03-05-submission.json`. Round-one CHANGES REQUIRED for `CK-03-05-R1-F01`: threshold tolerance misclassifies representable just-below0.25 holds as heavy. One coordinated repair assigned to original builder; preserve strict below/at distinction and stable15/72tick timing, suggested compensated held-time accumulation. Also clarify InputSampler vs dispatcher cancellation ownership in handoff. Original builder/independent checks app157/tool7/typecheck/build PASS; no acceptance yet. Repaired `/tmp/cryptkeep-CK-03-05-repaired-r1.json` submitted: strict threshold comparator plus Kahan held-time compensation, direct close-below regressions, source typecheck/app158/tool7/build PASS. Same reviewer now verifies; no further repair in round1.
