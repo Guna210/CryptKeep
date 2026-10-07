@@ -10,10 +10,13 @@ test("Space activates one captured dash, costs once, and a fresh press works aft
   await page.keyboard.down("Space");
   await expect.poll(async()=>(await player()).resources!.stamina.current).toBe(75);
   await expect.poll(async()=>Math.hypot((await player()).pose!.x-spawn.x,(await player()).pose!.z-spawn.z)).toBeGreaterThan(0.3);
-  await page.waitForTimeout(200);
+  const activeTick=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick);
+  await expect.poll(()=>page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick),{timeout:15000}).toBeGreaterThanOrEqual(activeTick+12);
   expect((await player()).resources!.stamina.current).toBeLessThanOrEqual(75.1);
   await page.keyboard.up("Space");
-  await expect.poll(async()=>(await player()).dash.cooldownRemainingSeconds).toBe(0);
+  const releaseTick=await page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick);
+  await expect.poll(()=>page.evaluate(()=>window.__cryptkeepDiagnostics!.snapshot().floor!.tick),{timeout:15000}).toBeGreaterThanOrEqual(releaseTick+66);
+  expect((await player()).dash.cooldownRemainingSeconds).toBe(0);
   const beforeSecond=(await player()).resources!.stamina.current;
   await page.keyboard.down("Space");
   await expect.poll(async()=>(await player()).resources!.stamina.current,{timeout:1500}).toBeLessThan(beforeSecond-20);

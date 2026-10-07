@@ -20,8 +20,8 @@ export interface RenderedFloor {
 const MARKERS: readonly SpawnPadKind[] = ["entry", "boss", "reward", "exit"];
 const matrix = new Matrix4();
 const blockShape = new Shape();
-blockShape.moveTo(-0.42, -0.34); blockShape.lineTo(0.42, -0.34); blockShape.lineTo(0.42, 0.34); blockShape.lineTo(-0.42, 0.34); blockShape.closePath();
-const STONE_TONES = [0x57777b, 0x66868a, 0x49686e, 0x718c8c, 0x526f75, 0x809293] as const;
+blockShape.moveTo(-0.4, -0.44); blockShape.lineTo(0.4, -0.44); blockShape.lineTo(0.4, 0.44); blockShape.lineTo(-0.4, 0.44); blockShape.closePath();
+const STONE_TONES = [0x789b9e, 0x86a8a9, 0x6f9094, 0x94b1ae, 0x789396, 0x9fbab4] as const;
 
 /** Build instanced floor, ceiling, boundary walls and role markers. Materials are borrowed. */
 export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrary, options: RenderedFloorOptions = {}): RenderedFloor {
@@ -71,38 +71,47 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
     addInstances(surface, library.materials.floor, walkable);
     const ceiling = new BoxGeometry(2, 0.1, 2);
     addInstances(ceiling, library.materials.stone, walkable.map((p) => ({ ...p, y: FLOOR_WALL_HEIGHT + 0.05 })), options.ceilingVisible !== false);
-    const mortarMaterial = new MeshStandardMaterial({ color: 0x283c40, roughness: 1 }); ownedMaterials.push(mortarMaterial);
-    addInstances(new BoxGeometry(0.14, 3, 2), mortarMaterial, wallX.map(p => ({...p, y:1.5, sx:1, sy:1, sz:1})));
-    addInstances(new BoxGeometry(2, 3, 0.14), mortarMaterial, wallZ.map(p => ({...p, y:1.5, sx:1, sy:1, sz:1})));
+    const mortarMaterial = new MeshStandardMaterial({ color: 0x344c4e, roughness: 1 }); ownedMaterials.push(mortarMaterial);
+    const mortarGeometry=new BoxGeometry(1,1,1); geometries.add(mortarGeometry);
+    const mortarEdges=[...wallX.map(p=>({...p,normal:"x" as const})),...wallZ.map(p=>({...p,normal:"z" as const}))];
+    if(mortarEdges.length){
+      const mortar=new InstancedMesh(mortarGeometry,mortarMaterial,mortarEdges.length);
+      mortarEdges.forEach((edge,i)=>{
+        matrix.makeScale(edge.normal==="x"?0.14:2,3,edge.normal==="x"?2:0.14);
+        matrix.setPosition(edge.x,1.5,edge.z); mortar.setMatrixAt(i,matrix);
+      });
+      mortar.instanceMatrix.needsUpdate=true; mortar.computeBoundingSphere(); root.add(mortar); meshes.push(mortar);
+    }
     const masonry = new ExtrudeGeometry(blockShape, { depth: 0.18, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.045, bevelThickness: 0.04, curveSegments: 1 });
     masonry.translate(0, 0, -0.09);
-    const placeBlocks = (edges: typeof wallX, rotated: boolean) => {
-      const blocks: { x:number;y:number;z:number;sx:number;sy:number;sz:number }[] = [];
-      for (const edge of edges) for (let row=0; row<4; row++) for (let half=0;half<2;half++) {
-        const stagger = row % 2 ? 0.04 : -0.04;
-        const along = (rotated ? edge.z : edge.x) + (half ? 0.45 : -0.45) + stagger;
-        const vertical = 0.39 + row * 0.72;
-        blocks.push(rotated ? {x:edge.x,y:vertical,z:along,sx:1,sy:1,sz:1} : {x:along,y:vertical,z:edge.z,sx:1,sy:1,sz:1});
-      }
-      const mesh = new InstancedMesh(masonry, library.materials.stone, blocks.length);
+    const blocks: Array<{x:number;y:number;z:number;yaw:number}>=[];
+    for(const edge of wallX)for(let row=0;row<3;row++)for(let half=0;half<2;half++){
+      const along=edge.z+(half?0.48:-0.48)+(row%2?0.02:-0.02);
+      blocks.push({x:edge.x,y:0.5+row,z:along,yaw:Math.PI/2});
+    }
+    for(const edge of wallZ)for(let row=0;row<3;row++)for(let half=0;half<2;half++){
+      const along=edge.x+(half?0.48:-0.48)+(row%2?0.02:-0.02);
+      blocks.push({x:along,y:0.5+row,z:edge.z,yaw:0});
+    }
+    const masonryMaterial=new MeshStandardMaterial({color:0xffffff,roughness:0.82,metalness:0.04,emissive:0x172a29,emissiveIntensity:0.35});
+    ownedMaterials.push(masonryMaterial);
+    if(blocks.length){
+      const mesh=new InstancedMesh(masonry,masonryMaterial,blocks.length);
       geometries.add(masonry);
-      blocks.forEach((p,i) => {
-        matrix.makeRotationY(rotated ? Math.PI/2 : 0);
-        matrix.scale(new Vector3(0.88 + ((i*13)%4)*0.035, 0.9 + ((i*7)%3)*0.045, 1));
-        matrix.setPosition(p.x,p.y,p.z);
-        mesh.setMatrixAt(i,matrix);
-        mesh.setColorAt(i, new Color(STONE_TONES[(i * 7 + Math.floor(p.x + p.z)) % STONE_TONES.length]));
+      blocks.forEach((p,i)=>{
+        matrix.makeRotationY(p.yaw);
+        matrix.scale(new Vector3(0.9+((i*13)%4)*0.025,0.9+((i*7)%3)*0.035,1));
+        matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);
+        mesh.setColorAt(i,new Color(STONE_TONES[(i*7+Math.floor(p.x+p.z))%STONE_TONES.length]));
       });
-      mesh.instanceMatrix.needsUpdate=true; mesh.computeBoundingSphere(); root.add(mesh); meshes.push(mesh);
-    };
-    // Block instances share a beveled, chamfered profile; row offsets expose the dark mortar seams.
-    placeBlocks(wallX, true); placeBlocks(wallZ, false);
+      mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
+    }
     // A small, deterministic set of warm sconces lights the route without per-cell lighting.
     const allSconceEdges = [...wallX.map(p=>({...p,face:"x" as const})), ...wallZ.map(p=>({...p,face:"z" as const}))];
     const entryX=plan.roles.entry.x*2+1, entryZ=plan.roles.entry.z*2+1;
-    const nearest=[...allSconceEdges].sort((a,b)=>Math.hypot(a.x-entryX,a.z-entryZ)-Math.hypot(b.x-entryX,b.z-entryZ)).slice(0,2);
-    const spread=[allSconceEdges[Math.floor(allSconceEdges.length/3)],allSconceEdges[Math.floor(2*allSconceEdges.length/3)]].filter((edge):edge is typeof allSconceEdges[number]=>Boolean(edge));
-    const sconceEdges=[...nearest,...spread].filter((edge,index,array)=>array.findIndex(item=>item.x===edge.x&&item.z===edge.z&&item.face===edge.face)===index).slice(0,4);
+    const nearest=[...allSconceEdges].sort((a,b)=>Math.hypot(a.x-entryX,a.z-entryZ)-Math.hypot(b.x-entryX,b.z-entryZ)).slice(0,1);
+    const spread=[allSconceEdges[Math.floor(allSconceEdges.length/2)]].filter((edge):edge is typeof allSconceEdges[number]=>Boolean(edge));
+    const sconceEdges=[...nearest,...spread].filter((edge,index,array)=>array.findIndex(item=>item.x===edge.x&&item.z===edge.z&&item.face===edge.face)===index).slice(0,2);
     if (sconceEdges.length) {
       const flameMaterial = new MeshStandardMaterial({ color:0xffb45a, emissive:0xff6b20, emissiveIntensity:1.7, roughness:0.7 });
       const ironMaterial = new MeshStandardMaterial({ color:0x26363a, roughness:0.8, metalness:0.55 });

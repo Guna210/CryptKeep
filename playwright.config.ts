@@ -5,7 +5,9 @@ export default defineConfig({
   testDir: "./tests/e2e",
   outputDir: "./test-results",
   reporter: "list",
-  workers: 2,
+  // CI uses software WebGL; two full-resolution Chromium pages contending for one runner
+  // starve requestAnimationFrame and make native input timing nondeterministic.
+  workers: process.env.CI ? 1 : 2,
   use: {
     browserName: "chromium",
     headless: true,

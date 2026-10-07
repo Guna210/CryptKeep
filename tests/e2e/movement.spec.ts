@@ -9,6 +9,11 @@ test("real player input moves, mouse changes the camera, and release stops motio
   await page.goto("/");
   await expect(page.getByText("DUNGEON PREVIEW")).toBeVisible();
   const player = () => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().player!);
+  const tick = () => page.evaluate(() => window.__cryptkeepDiagnostics!.snapshot().floor!.tick);
+  const waitTicks = async (amount:number) => {
+    const start=await tick();
+    await expect.poll(tick,{timeout:15000}).toBeGreaterThanOrEqual(start+amount);
+  };
   const before = await player();
   expect(before.pose).toMatchObject({x:expect.any(Number),y:1.6,z:expect.any(Number),yaw:0});
   await page.getByLabel("Dungeon seed").focus();
@@ -23,7 +28,7 @@ test("real player input moves, mouse changes the camera, and release stops motio
   await page.getByRole("button", {name:"Explore dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
   await page.keyboard.down("w");
-  await page.waitForTimeout(300);
+  await waitTicks(12);
   await page.evaluate(() => document.querySelector(".cryptkeep__overlay")?.classList.remove("cryptkeep__overlay--playing", "cryptkeep__overlay--session-started"));
   // Synthetic focusin exercises the editable-target guard while capture normally hides the seed form.
   await page.getByLabel("Dungeon seed").evaluate((input) => input.dispatchEvent(new FocusEvent("focusin", {bubbles:true})));
@@ -40,7 +45,7 @@ test("real player input moves, mouse changes the camera, and release stops motio
   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
   await page.mouse.move(box.x+box.width/2+70,box.y+box.height/2-18);
   await page.keyboard.down("w");
-  await page.waitForTimeout(700);
+  await waitTicks(42);
   await page.keyboard.up("w");
   const moving = await player();
   expect(moving.active).toBe(true);
@@ -55,15 +60,17 @@ test("real player input moves, mouse changes the camera, and release stops motio
   expect(released.active).toBe(false);
   expect(released.velocity).toEqual({x:0,y:0,z:0});
   const stoppedAt = released.pose;
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(250); // observe that the paused pose remains frozen
   expect((await player()).pose).toEqual(stoppedAt);
   await page.getByRole("button", {name:"Resume dungeon"}).click();
   await expect.poll(() => page.evaluate(() => document.pointerLockElement?.tagName)).toBe("CANVAS");
+  const repeatedStartTick=await tick();
   await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", {key:"w", repeat:true, bubbles:true, cancelable:true})));
-  await page.waitForTimeout(250);
+  await expect.poll(tick,{timeout:15000}).toBeGreaterThanOrEqual(repeatedStartTick+15);
   expect((await player()).pose).toEqual(stoppedAt);
+  const freshStartTick=await tick();
   await page.keyboard.down("w");
-  await page.waitForTimeout(450);
+  await expect.poll(tick,{timeout:15000}).toBeGreaterThanOrEqual(freshStartTick+24);
   await page.keyboard.up("w");
   expect(Math.hypot((await player()).pose!.x-stoppedAt!.x,(await player()).pose!.z-stoppedAt!.z)).toBeGreaterThan(0.2);
   await page.evaluate(() => window.dispatchEvent(new Event("blur")));

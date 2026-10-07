@@ -41,13 +41,27 @@ describe("rendered floor ownership and placement", () => {
     expect(ceilingCenters).toEqual(actual);
     expect(floor.counts.markers).toBe(4);
     expect(floor.counts.instances).toBeGreaterThan(floors.count * 2);
-    expect(floor.root.children.length).toBeLessThanOrEqual(20);
+    expect(floor.root.children.length).toBeLessThanOrEqual(16);
     const wallMeshes = floor.root.children.filter((item: any) => item.material === library.materials.stone) as any[];
-    expect(wallMeshes).toHaveLength(3); // ceiling plus the two oriented boundary batches
-    const masonry=wallMeshes.slice(1);
-    expect(masonry.every(mesh=>mesh.geometry.type==="ExtrudeGeometry")).toBe(true);
+    expect(wallMeshes).toHaveLength(1); // ceiling retains the shared stone library material
+    const masonry=floor.root.children.filter((item:any)=>item.geometry?.type==="ExtrudeGeometry") as any[];
+    expect(masonry).toHaveLength(1); // both wall orientations share one geometry/material batch
     expect(masonry.every(mesh=>mesh.count>0&&mesh.instanceColor!==null)).toBe(true);
-    expect(masonry.reduce((sum,mesh)=>sum+mesh.count,0)).toBeGreaterThan(100);
+    expect(masonry[0].material.map).toBeNull();
+    expect(masonry[0].material.emissiveIntensity).toBeGreaterThan(0);
+    masonry[0].geometry.computeBoundingBox();
+    const stoneBounds=masonry[0].geometry.boundingBox!;
+    let wallBottom=Infinity,wallTop=-Infinity;
+    for(let i=0;i<masonry[0].count;i++){
+      masonry[0].getMatrixAt(i,point);
+      const halfHeight=Math.max(Math.abs(stoneBounds.min.y),Math.abs(stoneBounds.max.y))*Math.abs(point.elements[5]);
+      wallBottom=Math.min(wallBottom,point.elements[13]-halfHeight);
+      wallTop=Math.max(wallTop,point.elements[13]+halfHeight);
+    }
+    expect(wallTop-wallBottom).toBeGreaterThan(2.8);
+    expect(masonry[0].count).toBeGreaterThan(100);
+    const mortar=floor.root.children.find((item:any)=>item.geometry?.parameters?.width===1&&item.geometry?.parameters?.height===1&&item.geometry?.parameters?.depth===1) as any;
+    expect(mortar.count).toBeGreaterThan(0);
     for(const mesh of masonry){
       mesh.geometry.computeBoundingBox();
       const bounds=mesh.geometry.boundingBox!;
@@ -68,7 +82,7 @@ describe("rendered floor ownership and placement", () => {
       }
     }
     expect(floor.root.children.filter((item:any)=>item.type==="PointLight").length).toBeGreaterThan(0);
-    expect(floor.root.children.filter((item:any)=>item.type==="PointLight").length).toBeLessThanOrEqual(4);
+    expect(floor.root.children.filter((item:any)=>item.type==="PointLight").length).toBeLessThanOrEqual(2);
     const moss=floor.root.children.find((item:any)=>item.geometry?.type==="PlaneGeometry") as any;
     expect(moss.count).toBeGreaterThan(0);
     expect(moss.count).toBeLessThanOrEqual(16);
