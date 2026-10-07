@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { generateFloor } from "../dungeon/generate";
-import { CELL_SIZE_METERS } from "../dungeon/grid";
-import { PLAYER_CAMERA_HEIGHT_METERS, PLAYER_RADIUS_METERS, createPlayerState, entrySpawnPosition, isPoseValid } from "./state";
+import { CELL_SIZE_METERS, createGrid } from "../dungeon/grid";
+import { Tile } from "../dungeon/types";
+import { PLAYER_CAMERA_HEIGHT_METERS, PLAYER_RADIUS_METERS, createGridPlayerState, createPlayerState, entrySpawnPosition, isPoseValid } from "./state";
 
 describe("player safe spawn state", () => {
+  it("validates explicit Grid poses with the same radius/resources without role metadata",()=>{
+    const grid=createGrid(9,9,Array.from({length:81},(_,i)=>{const x=i%9,z=Math.floor(i/9);return x===0||z===0||x===8||z===8?Tile.Solid:Tile.Walkable;}));
+    const pose={x:10.3,z:10.5,yaw:.8};
+    const initialized=createGridPlayerState(grid,pose);
+    expect(initialized.repaired).toBe(false);expect(initialized.state.pose).toMatchObject({...pose,y:PLAYER_CAMERA_HEIGHT_METERS});
+    expect(initialized.state.health).toEqual({current:100,maximum:100});expect(initialized.state.stamina).toEqual({current:100,maximum:100});expect(initialized.state.mana).toEqual({current:60,maximum:60});
+    expect(isPoseValid(grid,pose)).toBe(true);expect(()=>createGridPlayerState(grid,{x:2,z:2})).toThrow("must clear the Grid");
+  });
   it("creates base resources and retains a valid supplied pose", () => {
     const floor = generateFloor({ campaignSeed: "player-valid-pose", floorNumber: 1 }).plan;
     const entry = entrySpawnPosition(floor);

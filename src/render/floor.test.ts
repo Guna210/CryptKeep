@@ -2,9 +2,18 @@ import { Group, Matrix4 } from "three";
 import { describe, expect, it, vi } from "vitest";
 import { generateFloor } from "../dungeon/generate";
 import { createMaterialLibrary } from "./materials";
-import { createRenderedFloor } from "./floor";
+import { createRenderedFloor, createRenderedGrid } from "./floor";
+import { createGrid } from "../dungeon/grid";
+import { Tile } from "../dungeon/types";
 
 describe("rendered floor ownership and placement", () => {
+  it("renders diagnostic Grid occupancy with 2m tiles and 3m boundary walls while borrowing materials",()=>{
+    const library=createMaterialLibrary("grid-render",16);const grid=createGrid(3,3,[Tile.Solid,Tile.Solid,Tile.Solid,Tile.Solid,Tile.Walkable,Tile.Solid,Tile.Solid,Tile.Solid,Tile.Solid]);
+    const rendered=createRenderedGrid(grid,library);expect(rendered.counts.markers).toBe(0);expect(rendered.counts.instances).toBe(5);
+    const [floor,walls]=rendered.root.children as any[];expect(floor.material).toBe(library.materials.floor);expect(floor.geometry.parameters.height).toBe(.1);expect(floor.count).toBe(1);
+    expect(walls.material).toBe(library.materials.stone);expect(walls.geometry.parameters.height).toBe(2);expect(walls.count).toBe(4);
+    rendered.dispose();rendered.dispose();expect(rendered.root.children).toHaveLength(0);expect(library.materials.floor).toBeTruthy();library.dispose();
+  });
   it("covers walkable centers, bounds walls at solid edges, and places four role markers", () => {
     const plan = generateFloor({ campaignSeed: "floor-render-contract", floorNumber: 3 }).plan;
     const library = createMaterialLibrary("floor-render-contract", 16);

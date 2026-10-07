@@ -5,6 +5,8 @@ import type { EventBatch } from "../core/events";
 import { createMaterialLibrary } from "../render/materials";
 import { FloorSession, type FloorSessionOptions } from "./floor-session";
 import type { WorldRenderer } from "../render/renderer";
+import { createGrid } from "../dungeon/grid";
+import { Tile } from "../dungeon/types";
 
 function harness(options: FloorSessionOptions = {}) {
   const scene = new Scene();
@@ -13,6 +15,18 @@ function harness(options: FloorSessionOptions = {}) {
 }
 
 describe("FloorSession", () => {
+  it("installs a diagnostic Grid as its own paused world and retires it on generated replacement",async()=>{
+    const retired:string[]=[];
+    const {scene,session}=harness({createFloor:floor=>{const root=new Group();return {root,counts:{geometries:0,instances:0,markers:4},dispose(){retired.push("generated");root.removeFromParent();}};},createDiagnosticFloor:grid=>{const root=new Group();return {root,counts:{geometries:0,instances:grid.tiles.length,markers:0},dispose(){retired.push("diagnostic");root.removeFromParent();}};}});
+    const grid=createGrid(9,9,Array(81).fill(Tile.Walkable));
+    session.installDiagnosticGrid(grid);
+    expect(session.snapshot()).toMatchObject({worldKind:"diagnostic",width:9,height:9,diagnosticGrid:grid,floorSeed:null,floorNumber:null,contentHash:null,roleMarkers:null,lifecycle:"paused"});
+    expect(session.snapshot().walkableCount).toBe(81);expect(session.snapshot().currentFloors).toBe(1);
+    const diagnosticRoot=scene.children[0];
+    await session.load("replacement");
+    expect(diagnosticRoot?.parent).toBeNull();expect(retired).toEqual(["diagnostic"]);expect(session.snapshot().worldKind).toBe("generated");
+    session.dispose();
+  });
   it("loads generated floors, replaces once, and exposes detached deterministic diagnostics", async () => {
     const disposed: number[] = [];
     const { scene, session } = harness({ createFloor: (floor) => {

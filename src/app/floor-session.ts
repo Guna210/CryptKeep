@@ -5,9 +5,12 @@ import { generateFloor, type GeneratedFloor } from "../dungeon/generate";
 import { createMaterialLibrary, type MaterialLibrary } from "../render/materials";
 import { createRenderedFloor, FLOOR_CELL_METERS, type RenderedFloor } from "../render/floor";
 import { Tile } from "../dungeon/types";
+import { createGrid } from "../dungeon/grid";
 import type { WorldRenderer } from "../render/renderer";
+import type { Grid } from "../dungeon/types";
 
 export interface FloorSessionSnapshot {
+  readonly worldKind: "generated" | "diagnostic";
   readonly lifecycle: "loading" | "ready" | "paused" | "failed" | "disposed";
   readonly campaignSeed: string | null;
   readonly floorSeed: string | null;
@@ -15,6 +18,7 @@ export interface FloorSessionSnapshot {
   readonly contentHash: string | null;
   readonly width: number | null;
   readonly height: number | null;
+  readonly diagnosticGrid: Grid | null;
   readonly roomCount: number;
   readonly walkableCount: number;
   readonly roleMarkers: Readonly<{ entry: Readonly<{x:number;z:number}>; boss: Readonly<{x:number;z:number}>; reward: Readonly<{x:number;z:number}>; exit: Readonly<{x:number;z:number}> }> | null;
@@ -32,6 +36,7 @@ export interface FloorSessionOptions {
   readonly createLibrary?: (seed:string) => MaterialLibrary;
   readonly createFloor?: (floor:GeneratedFloor, library:MaterialLibrary) => RenderedFloor;
   readonly yieldFrame?: () => Promise<void>;
+  readonly createDiagnosticFloor?: (grid:Grid, library:MaterialLibrary) => RenderedFloor;
 }
 
 /** Owns the active generated/rendered floor and the shared material library. */
@@ -40,6 +45,7 @@ export class FloorSession {
   private readonly makeLibrary: NonNullable<FloorSessionOptions["createLibrary"]>;
   private readonly makeFloor: NonNullable<FloorSessionOptions["createFloor"]>;
   private readonly yieldFrame: NonNullable<FloorSessionOptions["yieldFrame"]>;
+  private readonly makeDiagnosticFloor: NonNullable<FloorSessionOptions["createDiagnosticFloor"]> | undefined;
   private readonly clock = new FixedStepClock();
   private readonly events = new EventCollector();
   private readonly unsubs = new Set<Unsubscribe>();
@@ -56,12 +62,34 @@ export class FloorSession {
   private readyEmitted = false;
   private sessionErrors = 0;
   private lastSessionError: string | null = null;
+  private diagnosticGrid: Grid | null = null;
 
   constructor(private readonly world: WorldRenderer, options: FloorSessionOptions = {}) {
     this.generate = options.generate ?? ((seed, floor) => generateFloor({ campaignSeed: seed, floorNumber: floor }));
     this.makeLibrary = options.createLibrary ?? createMaterialLibrary;
     this.makeFloor = options.createFloor ?? ((floor, library) => createRenderedFloor(floor.plan, library, { ceilingVisible: false }));
     this.yieldFrame = options.yieldFrame ?? (() => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0))));
+    this.makeDiagnosticFloor = options.createDiagnosticFloor;
+  }
+
+  installDiagnosticGrid(inputGrid:Grid):Grid {
+    if (!import.meta.env.DEV && import.meta.env.MODE !== "test") throw new Error("Diagnostic worlds are available only in development or tests");
+    if (!this.makeDiagnosticFloor || !inputGrid || !Array.isArray(inputGrid.tiles) || inputGrid.width < 1 || inputGrid.height < 1 || inputGrid.tiles.length !== inputGrid.width*inputGrid.height) throw new TypeError("A diagnostic renderer and valid Grid are required");
+    if (this.disposed) throw new Error("Floor session is disposed");
+    for(const tile of inputGrid.tiles) if(tile!==Tile.Solid&&tile!==Tile.Walkable) throw new TypeError("Diagnostic Grid contains an invalid tile");
+    const grid=createGrid(inputGrid.width,inputGrid.height,inputGrid.tiles);
+    const request=++this.request;
+    const library=this.library ?? this.makeLibrary("diagnostic-training");
+    let pending:RenderedFloor;
+    try { pending=this.makeDiagnosticFloor(grid,library); }
+    catch(error) { if(!this.library) library.dispose(); throw error; }
+    if(request!==this.request || this.disposed) { pending.dispose(); if(!this.library) library.dispose(); throw new Error("Diagnostic installation superseded"); }
+    const previous=this.rendered, oldLibrary=this.library;
+    this.world.scene.add(pending.root); pending.root.updateMatrixWorld(true);
+    this.rendered=pending; this.library=library; this.generated=null; this.campaignSeed=null; this.diagnosticGrid=grid;
+    this.world.camera.position.set(grid.width, 4, grid.height+8); this.world.camera.lookAt(grid.width,0,grid.height); this.world.camera.updateProjectionMatrix();
+    this.clock.pause(); this.alpha=0; this.lifecycle="paused"; this.cleanup(()=>previous?.dispose()); if(oldLibrary && oldLibrary!==library) this.cleanup(()=>oldLibrary.dispose());
+    return grid;
   }
 
   async load(seedInput: string): Promise<GeneratedFloor> {
@@ -93,6 +121,7 @@ export class FloorSession {
       }
       this.rendered = pendingFloor;
       this.generated = generated;
+      this.diagnosticGrid = null;
       this.campaignSeed = seed;
       pendingFloor = null;
       if (oldFloor) this.cleanup(() => oldFloor.dispose());
@@ -150,10 +179,12 @@ export class FloorSession {
   snapshot(): Readonly<FloorSessionSnapshot> {
     const p = this.generated?.plan;
     let walkableCount = 0;
-    if (p) for (const tile of p.tiles) if (tile === Tile.Walkable) walkableCount++;
+    if (p) { for (const tile of p.tiles) if (tile === Tile.Walkable) walkableCount++; }
+    else if(this.diagnosticGrid) { for(const tile of this.diagnosticGrid.tiles) if(tile===Tile.Walkable) walkableCount++; }
     const markers = p ? Object.freeze({ entry:Object.freeze({...p.roles.entry}), boss:Object.freeze({...p.roles.boss}), reward:Object.freeze({...p.roles.reward}), exit:Object.freeze({...p.roles.exit}) }) : null;
-    return Object.freeze({ lifecycle:this.lifecycle, campaignSeed:this.campaignSeed, floorSeed:p?.floorSeed ?? null, floorNumber:p?.floorNumber ?? null,
-      contentHash:this.generated?.contentHash ?? null, width:p?.width ?? null, height:p?.height ?? null, roomCount:p?.rooms.length ?? 0,
+    const grid=this.diagnosticGrid;
+    return Object.freeze({ worldKind:grid?"diagnostic":"generated", lifecycle:this.lifecycle, campaignSeed:this.campaignSeed, floorSeed:p?.floorSeed ?? null, floorNumber:p?.floorNumber ?? null,
+      contentHash:this.generated?.contentHash ?? null, width:p?.width ?? grid?.width ?? null, height:p?.height ?? grid?.height ?? null, diagnosticGrid:grid, roomCount:p?.rooms.length ?? 0,
       walkableCount, roleMarkers:markers, attempts:this.generated?.diagnostics.attempts ?? null, usedFallback:this.generated?.diagnostics.usedFallback ?? null,
       currentFloors:this.rendered ? 1 : 0, tick:this.tick, alpha:this.alpha, droppedTimeSeconds:this.droppedTimeSeconds,
       sessionErrors:this.sessionErrors, lastSessionError:this.lastSessionError });
@@ -169,7 +200,7 @@ export class FloorSession {
     for (const unsubscribe of this.unsubs) this.cleanup(unsubscribe);
     this.unsubs.clear();
     this.cleanup(() => this.events.dispose());
-    this.generated = null; this.campaignSeed = null; this.lifecycle = "disposed";
+    this.generated = null; this.diagnosticGrid=null; this.campaignSeed = null; this.lifecycle = "disposed";
   }
   private dispatch(event: {type:"session-ready"}|{type:"session-paused"|"session-resumed";reason:string}|{type:"session-disposed"}):void {
     try {

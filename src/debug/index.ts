@@ -1,6 +1,7 @@
 import type { RendererResourceCounts } from "../render/renderer";
 import type { FloorSessionSnapshot } from "../app/floor-session";
 import type { PlayerSessionSnapshot } from "../app/player-session";
+import type { CombatSnapshot } from "../app/combat-session";
 
 export type AppReadiness = "initializing" | "ready" | "unsupported";
 
@@ -9,6 +10,7 @@ export interface DiagnosticSnapshot {
   renderer: Readonly<RendererResourceCounts> | null;
   floor: Readonly<FloorSessionSnapshot> | null;
   player: Readonly<PlayerSessionSnapshot> | null;
+  combat?: Readonly<CombatSnapshot> | null;
 }
 
 declare global {
@@ -24,12 +26,14 @@ export function installDiagnostics(
   getRendererCounts: () => RendererResourceCounts | null,
   getFloorSnapshot: () => Readonly<FloorSessionSnapshot> | null = () => null,
   getPlayerSnapshot: () => Readonly<PlayerSessionSnapshot> | null = () => null,
+  getCombatSnapshot: () => Readonly<CombatSnapshot> | null = () => null,
 ): { dispose(): void } {
   const api = Object.freeze({
     snapshot(): Readonly<DiagnosticSnapshot> {
       const counts = getRendererCounts();
       const renderer = counts ? Object.freeze({ ...counts }) : null;
-      return Object.freeze({ readiness: getReadiness(), renderer, floor: getFloorSnapshot(), player:getPlayerSnapshot() });
+      const combat=getCombatSnapshot();
+      return Object.freeze({ readiness: getReadiness(), renderer, floor: getFloorSnapshot(), player:getPlayerSnapshot(), ...(combat?{combat}: {}) });
     },
   });
   Object.defineProperty(window, "__cryptkeepDiagnostics", {

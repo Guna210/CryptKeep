@@ -1,6 +1,7 @@
 import { CELL_SIZE_METERS } from "../dungeon/grid";
 import { Tile, type WorldXZ } from "../dungeon/types";
 import type { RoleFloorPlan } from "../dungeon/roles";
+import type { Grid } from "../dungeon/types";
 import { createResource, INITIAL_HEALTH, INITIAL_MANA, INITIAL_STAMINA, type ResourceValue } from "./resources";
 
 export const PLAYER_RADIUS_METERS = 0.28;
@@ -77,7 +78,7 @@ export function createPlayerState(floor: RoleFloorPlan, suppliedPose?: PlayerPos
 }
 
 /** Check finite pose angles and circular clearance against tile AABBs. */
-export function isPoseValid(floor: RoleFloorPlan, pose: PlayerPoseInput | undefined): pose is PlayerPoseInput {
+export function isPoseValid(floor: Grid, pose: PlayerPoseInput | undefined): pose is PlayerPoseInput {
   if (!pose || !Number.isFinite(pose.x) || !Number.isFinite(pose.z) ||
     (pose.y !== undefined && !Number.isFinite(pose.y)) ||
     (pose.yaw !== undefined && !Number.isFinite(pose.yaw)) ||
@@ -107,6 +108,16 @@ export function isPoseValid(floor: RoleFloorPlan, pose: PlayerPoseInput | undefi
     if (floor.tiles[z * floor.width + x] !== Tile.Walkable) return false;
   }
   return true;
+}
+
+/** Initialize a player at an explicitly supplied, clearance-validated diagnostic Grid pose. */
+export function createGridPlayerState(grid: Grid, suppliedPose: PlayerPoseInput): SpawnResult {
+  if (!grid || !Array.isArray(grid.tiles) || grid.tiles.length !== grid.width * grid.height) throw new TypeError("A valid grid is required");
+  if (!isPoseValid(grid, suppliedPose)) throw new RangeError("Supplied diagnostic pose must clear the Grid");
+  const pose = Object.freeze({ x:suppliedPose.x, y:PLAYER_CAMERA_HEIGHT_METERS, z:suppliedPose.z, yaw:suppliedPose.yaw ?? 0, pitch:suppliedPose.pitch ?? 0 });
+  return Object.freeze({ state:Object.freeze({ pose, velocity:Object.freeze({x:0,y:0,z:0}), radius:PLAYER_RADIUS_METERS,
+    cameraHeight:PLAYER_CAMERA_HEIGHT_METERS, health:createResource(INITIAL_HEALTH, INITIAL_HEALTH),
+    stamina:createResource(INITIAL_STAMINA, INITIAL_STAMINA), mana:createResource(INITIAL_MANA, INITIAL_MANA) }), repaired:false });
 }
 
 function assertFloor(floor: RoleFloorPlan): void {

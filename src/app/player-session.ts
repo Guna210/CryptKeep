@@ -3,12 +3,14 @@ import { InputSampler } from "../core/input";
 import { applyMouseLook } from "../player/look";
 import { stepLocomotion } from "../player/movement";
 import { moveCircleOnGrid } from "../player/collision";
-import { createPlayerState, type PlayerState } from "../player/state";
+import { createPlayerState, createGridPlayerState, type PlayerState, type PlayerPoseInput } from "../player/state";
 import { advanceResourceRegeneration, createResourceRegenTimers, recordStaminaSpend, type ResourceRegenTimers } from "../player/resources";
 import { commitSprintMovement, decideSprint, hasSprintMovement } from "../player/sprint";
 import { activateDash, advanceDash, cancelDash, createDashState, resolveDashCollision, type DashState } from "../player/dash";
 import type { WorldRenderer } from "../render/renderer";
 import type { RoleFloorPlan } from "../dungeon/roles";
+import type { Grid } from "../dungeon/types";
+import type { CombatSession } from "./combat-session";
 import type { FloorSession } from "./floor-session";
 import { createPointerCapture, type PointerCapture, type PointerCaptureReason, type PointerCaptureState } from "./pointer-capture";
 
@@ -38,6 +40,8 @@ export class PlayerSession {
   readonly capture: PointerCapture;
   private state: PlayerState | null = null;
   private plan: RoleFloorPlan | null = null;
+  private grid: Grid | null = null;
+  private combat: CombatSession | null = null;
   private previous: PlayerState["pose"] | null = null;
   private active = false;
   private disposed = false;
@@ -85,6 +89,7 @@ export class PlayerSession {
     private readonly onCaptureChange: (state: PointerCaptureState, reason?: PointerCaptureReason) => void = () => {}) {
     this.capture = createPointerCapture(surface, this.input, { onStateChange: (state, reason) => {
       if (state !== "captured") {
+        this.combat?.cancel(reason === "blur" || reason === "hidden" ? reason : "pointer-lock-lost");
         this.input.clearInput(state === "failed" ? "pointer-lock-lost" : "pause");
         this.active = false;
         this.stopMotion();
@@ -102,11 +107,13 @@ export class PlayerSession {
 
   async load(seed: string) {
     this.active = false;
+    this.combat?.cancel("floor-loading");
     this.capture.release("floor-loading");
     this.floor.pause("floor-loading");
     const generated = await this.floor.load(seed);
     if (this.disposed) throw new Error("Player session is disposed");
     this.plan = generated.plan;
+    this.grid = generated.plan;
     const created = createPlayerState(generated.plan);
     this.state = created.state;
     this.regenTimers = createResourceRegenTimers();
@@ -115,6 +122,17 @@ export class PlayerSession {
     this.previous = created.state.pose;
     this.applyCamera(1);
     return generated;
+  }
+
+  setCombatSession(combat:CombatSession|null):void { this.combat=combat; }
+  loadDiagnostic(grid:Grid,pose:PlayerPoseInput):void {
+    if (!import.meta.env.DEV && import.meta.env.MODE !== "test") throw new Error("Diagnostic player state is available only in development or tests");
+    if (this.disposed) throw new Error("Player session is disposed");
+    const created=createGridPlayerState(grid,pose);
+    this.combat?.cancel("floor-loading");
+    this.active=false; this.capture.release("floor-loading"); this.floor.pause("floor-loading");
+    this.plan=null; this.grid=grid; this.state=created.state; this.regenTimers=createResourceRegenTimers(); this.sprinting=false;
+    this.dash=createDashState(); this.previous=created.state.pose; this.lastSample=null; this.input.clearInput("floor-loading"); this.applyCamera(1);
   }
 
   requestFromGesture(): void {
@@ -130,6 +148,7 @@ export class PlayerSession {
 
   release(reason: "pause" | "blur" | "hidden" = "pause"): void {
     this.active = false;
+    this.combat?.cancel(reason);
     this.capture.release(reason);
     this.floor.pause(reason);
   }
@@ -153,14 +172,15 @@ export class PlayerSession {
       }
       if (this.dash.active) {
         const dashStep = advanceDash(this.dash, FIXED_STEP_SECONDS);
-        const moved = moveCircleOnGrid(this.plan!, this.state.pose, dashStep.displacement, this.state.radius);
+        const moved = moveCircleOnGrid(this.grid!, this.state.pose, dashStep.displacement, this.state.radius);
         const resolvedDash = resolveDashCollision(dashStep, moved);
         this.dash = resolvedDash.state;
         this.sprinting = false;
-        const regenerated = advanceResourceRegeneration(this.state, this.regenTimers, FIXED_STEP_SECONDS, {staminaSpent,active:this.active});
+        this.state = Object.freeze({...this.state, pose:Object.freeze({...this.state.pose,x:resolvedDash.position.x,z:resolvedDash.position.z}), velocity:resolvedDash.velocity});
+        const weaponSpent=this.stepCombat(command,result.steps,i);
+        const regenerated = advanceResourceRegeneration(this.state, this.regenTimers, FIXED_STEP_SECONDS, {staminaSpent:staminaSpent||weaponSpent,active:this.active});
         this.regenTimers = regenerated.timers;
-        this.state = Object.freeze({...this.state, stamina:regenerated.stamina, mana:regenerated.mana,
-          pose:Object.freeze({...this.state.pose,x:resolvedDash.position.x,z:resolvedDash.position.z}), velocity:resolvedDash.velocity});
+        this.state=Object.freeze({...this.state,stamina:regenerated.stamina,mana:regenerated.mana});
         continue;
       }
       // Cooldown is gameplay simulation time and continues after the dash ends.
@@ -172,21 +192,22 @@ export class PlayerSession {
       let base = this.state;
       if (!sprint.eligible) base = capPlanarVelocity(base, 3.5);
       let locomotion = stepLocomotion(base, command.movement, FIXED_STEP_SECONDS, { maxSpeed:sprint.maximumSpeed });
-      let moved = moveCircleOnGrid(this.plan!, base.pose, locomotion.displacement, base.radius);
+      let moved = moveCircleOnGrid(this.grid!, base.pose, locomotion.displacement, base.radius);
       let sprintMovementCandidate = sprint.eligible;
       if (sprint.eligible && !hasSprintMovement(moved.appliedDisplacement)) {
         sprintMovementCandidate = false;
         base = capPlanarVelocity(base, 3.5);
         locomotion = stepLocomotion(base, command.movement, FIXED_STEP_SECONDS);
-        moved = moveCircleOnGrid(this.plan!, base.pose, locomotion.displacement, base.radius);
+        moved = moveCircleOnGrid(this.grid!, base.pose, locomotion.displacement, base.radius);
       }
       const velocity = Object.freeze({ x:moved.blockedX ? 0 : locomotion.state.velocity.x, y:0, z:moved.blockedZ ? 0 : locomotion.state.velocity.z });
       const committed = commitSprintMovement(locomotion.state, sprintMovementCandidate ? sprint : { eligible:false, maximumSpeed:3.5, staminaCost:0 }, moved.appliedDisplacement);
       this.sprinting = committed.spent;
-      const regenerated = advanceResourceRegeneration(committed.state, this.regenTimers, FIXED_STEP_SECONDS, { staminaSpent:committed.spent || staminaSpent, active:this.active });
+      this.state=Object.freeze({ ...committed.state, pose:Object.freeze({ ...locomotion.state.pose, x:moved.position.x, z:moved.position.z }), velocity });
+      const weaponSpent=this.stepCombat(command,result.steps,i);
+      const regenerated = advanceResourceRegeneration(this.state, this.regenTimers, FIXED_STEP_SECONDS, { staminaSpent:committed.spent || staminaSpent || weaponSpent, active:this.active });
       this.regenTimers = regenerated.timers;
-      this.state = Object.freeze({ ...committed.state, health:regenerated.health, stamina:regenerated.stamina, mana:regenerated.mana,
-        pose:Object.freeze({ ...locomotion.state.pose, x:moved.position.x, z:moved.position.z }), velocity });
+      this.state = Object.freeze({ ...this.state, health:regenerated.health, stamina:regenerated.stamina, mana:regenerated.mana });
     }
     this.applyCamera(result.alpha);
     return result;
@@ -207,7 +228,7 @@ export class PlayerSession {
     doc.removeEventListener("keydown", this.onKeyDown); doc.removeEventListener("keyup", this.onKeyUp);
     doc.removeEventListener("focusin", this.onFocusIn);
     doc.removeEventListener("mousedown", this.onMouseDown); doc.removeEventListener("mouseup", this.onMouseUp);
-    this.input.clearInput("pause"); this.state = null; this.plan = null; this.previous = null; this.lastSample = null;
+    this.combat?.cancel("pause"); this.combat=null; this.input.clearInput("pause"); this.state = null; this.plan = null; this.grid=null; this.previous = null; this.lastSample = null;
   }
 
   private applyCamera(alpha: number): void {
@@ -223,6 +244,14 @@ export class PlayerSession {
     this.dash = cancelDash(this.dash);
     this.state = Object.freeze({ ...this.state, velocity:Object.freeze({x:0,y:0,z:0}) });
     this.previous = this.state.pose;
+  }
+  private stepCombat(command:ReturnType<InputSampler["sample"]>,steps:number,index:number):boolean {
+    if(!this.combat||!this.state)return false;
+    const before=this.state;
+    const tick=this.floor.snapshot().tick-steps+index+1;
+    const result=this.combat.step(before,command,FIXED_STEP_SECONDS,tick,this.regenTimers);
+    this.state=Object.freeze({...before,stamina:result.stamina}); this.regenTimers=result.regenTimers;
+    return result.staminaSpent;
   }
 }
 

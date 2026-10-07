@@ -100,6 +100,10 @@ html, body, #app {
 .cryptkeep__resume:disabled { opacity:.7; cursor:wait; }
 .cryptkeep__resume:focus-visible, .cryptkeep__explore:focus-visible { outline:3px solid #68dce5; outline-offset:3px; }
 .cryptkeep__help { margin:.55rem 0 0; color:#b9b4a6; font-size:.68rem; line-height:1.4; }
+.ck-training-controls { position:fixed; z-index:4; top:.65rem; right:.65rem; display:flex; align-items:center; gap:.4rem; padding:.45rem; color:#d5c4a6; background:rgb(9 11 16 / 88%); border:1px solid #806444; font:600 .72rem/1.2 system-ui,sans-serif; pointer-events:auto; }
+.ck-training-controls button { min-height:2rem; padding:.3rem .55rem; color:#eee3ca; background:#493525; border:1px solid #a17a50; font:inherit; cursor:pointer; }
+.ck-training-controls button:focus-visible { outline:2px solid #68dce5; outline-offset:2px; }
+.cryptkeep__overlay--playing ~ .ck-training-controls { pointer-events:none; opacity:.35; }
 .cryptkeep__overlay--playing { pointer-events:none; }
 .cryptkeep__overlay--playing .cryptkeep__panel { opacity:.48; pointer-events:auto; }
 .cryptkeep__overlay--session-started .cryptkeep__legend, .cryptkeep__overlay--session-started .cryptkeep__explore, .cryptkeep__overlay--session-started .cryptkeep__help { display:none; }
