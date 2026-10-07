@@ -46,9 +46,11 @@ test("seeded dungeon preview changes floors, recovers from invalid input and kee
   await expect(page.getByText("DUNGEON PREVIEW")).toBeVisible();
 
   for (let i = 0; i < 25; i++) {
-    await seed.fill(`cycle-${i}`);
-    await generate.click();
-    await expect.poll(() => read()).toMatchObject({ currentFloors: 1, lifecycle: "ready" });
+    await test.step(`complete reroll ${i + 1}/25`, async () => {
+      await seed.fill(`cycle-${i}`, { timeout: 5_000 });
+      await generate.click({ timeout: 5_000 });
+      await expect.poll(() => read(), { timeout: 5_000 }).toMatchObject({ currentFloors: 1, lifecycle: "ready" });
+    });
   }
   const stable = await read();
   expect(stable.currentFloors).toBe(1);
@@ -68,7 +70,7 @@ test("seeded dungeon preview changes floors, recovers from invalid input and kee
   await retainedForm.evaluate((element) => element.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(await page.evaluate(() => "__cryptkeepDiagnostics" in window)).toBe(false);
   browserHarness.assertNoErrors();
-});
+}, { timeout: 60_000 });
 
 test("floor diagnostics are detached and immutable", async ({ page, browserHarness }) => {
   await page.goto("/");
