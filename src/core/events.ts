@@ -1,11 +1,16 @@
-/** Lifecycle events currently produced by the simulation boundary. */
-export type LifecycleEventInput =
+/** Events emitted by the simulation boundary. Payloads stay flat and primitive so snapshots are detached. */
+export type GameEventInput =
   | { type: "session-ready" }
   | { type: "session-paused"; reason: string }
   | { type: "session-resumed"; reason: string }
-  | { type: "session-disposed" };
+  | { type: "session-disposed" }
+  | { type: "damage-applied"; sourceId: string; targetId: string; attackId: string; damageType: "physical"; amount: number; hpRemaining: number }
+  | { type: "entity-died"; sourceId: string; targetId: string; attackId: string; damageType: "physical" };
 
-export type GameEvent = LifecycleEventInput & { readonly tick: number };
+/** Kept as a named alias for lifecycle producers from CK-00-07. */
+export type LifecycleEventInput = Extract<GameEventInput, { type: `session-${string}` }>;
+
+export type GameEvent = Readonly<GameEventInput & { tick: number }>;
 export type EventBatch = readonly GameEvent[];
 export type EventSubscriber = (batch: EventBatch) => void;
 export type Unsubscribe = () => void;
@@ -36,16 +41,24 @@ export class EventCollector {
     this.tick = tick;
   }
 
-  emit(event: LifecycleEventInput): void {
+  emit(event: GameEventInput): void {
     this.assertUsable();
     this.assertNotDispatching();
     if (this.tick === undefined) throw new Error("beginTick must be called before emit");
 
     // Lifecycle event data is deliberately flat and primitive, so a fresh frozen
     // record severs every producer-owned reference before it is retained.
-    const snapshot: GameEvent = event.type === "session-paused" || event.type === "session-resumed"
-      ? Object.freeze({ type: event.type, reason: event.reason, tick: this.tick })
-      : Object.freeze({ type: event.type, tick: this.tick });
+    let snapshot: GameEvent;
+    switch (event.type) {
+      case "session-paused": case "session-resumed":
+        snapshot = Object.freeze({ type: event.type, reason: event.reason, tick: this.tick }); break;
+      case "damage-applied":
+        snapshot = Object.freeze({ type: event.type, sourceId: event.sourceId, targetId: event.targetId, attackId: event.attackId, damageType: event.damageType, amount: event.amount, hpRemaining: event.hpRemaining, tick: this.tick }); break;
+      case "entity-died":
+        snapshot = Object.freeze({ type: event.type, sourceId: event.sourceId, targetId: event.targetId, attackId: event.attackId, damageType: event.damageType, tick: this.tick }); break;
+      default:
+        snapshot = Object.freeze({ type: event.type, tick: this.tick });
+    }
     this.pending.push(snapshot);
   }
 

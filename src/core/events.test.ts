@@ -25,6 +25,22 @@ describe("EventCollector", () => {
     expect(Object.isFrozen(first[0])).toBe(true);
   });
 
+  it("copies and freezes typed damage and death event snapshots with their tick", () => {
+    const collector = new EventCollector();
+    collector.beginTick(12);
+    const damage = { type: "damage-applied" as const, sourceId: "hero", targetId: "ogre", attackId: "swing", damageType: "physical" as const, amount: 4, hpRemaining: 0 };
+    collector.emit(damage);
+    collector.emit({ type: "entity-died", sourceId: "hero", targetId: "ogre", attackId: "swing", damageType: "physical" });
+    damage.amount = 100;
+    const batch = collector.flush();
+    expect(batch).toEqual([
+      { type: "damage-applied", sourceId: "hero", targetId: "ogre", attackId: "swing", damageType: "physical", amount: 4, hpRemaining: 0, tick: 12 },
+      { type: "entity-died", sourceId: "hero", targetId: "ogre", attackId: "swing", damageType: "physical", tick: 12 },
+    ]);
+    expect(Object.isFrozen(batch[0])).toBe(true);
+    expect(Object.isFrozen(batch[1])).toBe(true);
+  });
+
   it("isolates subscribers and retained batches from attempted mutation", () => {
     const collector = new EventCollector();
     const secondSubscriberBatches: EventBatch[] = [];
