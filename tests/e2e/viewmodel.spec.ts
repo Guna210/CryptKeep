@@ -10,6 +10,8 @@ test("sword renders readable tap and charged poses and disposes its owned model"
   await expect(page.locator("#state")).toHaveText("fixture ready");
   const canvasSize = await page.locator("canvas").evaluate((canvas: HTMLCanvasElement) => [canvas.width, canvas.height]);
   expect(canvasSize).toEqual([480, 270]);
+  const initialDrawCalls = await page.evaluate(() => window.swordFixture.renderer.getResourceCounts().drawCalls);
+  expect(initialDrawCalls).toBeGreaterThan(0);
   await page.evaluate(() => {
     const s = window.swordFixture;
     s.setState(Object.freeze({ weaponClass: "sword", phase: "active", elapsedSeconds: 0.06,
@@ -17,12 +19,16 @@ test("sword renders readable tap and charged poses and disposes its owned model"
       committedTiming: Object.freeze({ windupSeconds: 0.06, activeSeconds: 0.12, recoverySeconds: 0.3 }),
       primaryHeld: false, heldTimeCompensationSeconds: 0 }));
   });
+  const tapDrawCalls = await page.evaluate(() => window.swordFixture.renderer.getResourceCounts().drawCalls);
+  expect(tapDrawCalls).toBeGreaterThan(0);
   await page.screenshot({ path: "test-results/CK-03-06/tap.png" });
   await page.evaluate(() => {
     const s = window.swordFixture;
     s.setState(Object.freeze({ weaponClass: "sword", phase: "anticipation", elapsedSeconds: 1.2, primaryHeld: true,
       attackId: null, heldTimeCompensationSeconds: 0, committedKind: null, committedDamage: null, committedTiming: null }));
   });
+  const chargeDrawCalls = await page.evaluate(() => window.swordFixture.renderer.getResourceCounts().drawCalls);
+  expect(chargeDrawCalls).toBeGreaterThan(0);
   await page.screenshot({ path: "test-results/CK-03-06/charge.png" });
   const disposed = await page.evaluate(() => window.swordFixture.dispose());
   expect(disposed).toEqual({ contextLost: true, cameraKept: true, rootRemoved: true });

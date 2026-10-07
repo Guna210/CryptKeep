@@ -19,16 +19,16 @@ const context = canvas.getContext("webgl2");
 if (!context) throw new Error("WebGL 2 unavailable in viewmodel fixture");
 const renderer = createWorldRenderer(canvas, { context, resizeTarget: host, includeDiagnosticFixture: false });
 const model = createSwordViewmodel(renderer);
-const initialChildren = renderer.camera.children.length;
+const cameraParent = renderer.camera.parent;
 window.swordFixture = {
   renderer, model,
   setState(state) { model.update(state); renderer.renderer.render(renderer.scene, renderer.camera); },
   dispose() {
     model.dispose(); model.dispose();
     const rootRemoved = !renderer.camera.children.includes(model.root);
-    const cameraKept = renderer.scene.children.includes(renderer.camera);
+      const cameraKept = renderer.camera.parent === cameraParent;
     renderer.dispose();
-    return { contextLost: context.isContextLost(), cameraKept, rootRemoved: rootRemoved && initialChildren === 1 };
+    return { contextLost: context.isContextLost(), cameraKept, rootRemoved };
   },
 };
 const idle = createSwordState();

@@ -38,10 +38,12 @@ describe("sword viewmodel", () => {
   it("attaches to the supplied camera and disposes only its own render resources idempotently", () => {
     const scene = new Scene();
     const camera = new PerspectiveCamera();
-    scene.add(camera);
     const sibling = new Group(); camera.add(sibling);
     const world = { scene, camera } as Pick<WorldRenderer, "scene" | "camera">;
     const model = createSwordViewmodel(world);
+    expect(scene.children).toContain(model.root);
+    expect(camera.parent).toBeNull();
+    expect(camera.children).toEqual([sibling]);
     const owned = model.root.children.slice();
     const disposals = owned.map((object) => {
       const part = object as Mesh;
@@ -56,12 +58,15 @@ describe("sword viewmodel", () => {
     const textureDispose = vi.fn(); texture.addEventListener("dispose", textureDispose);
     model.detach();
     expect(camera.children).toEqual([sibling]);
+    expect(scene.children).not.toContain(model.root);
     model.attach();
     model.update(state("active", 0, "sword-heavy"));
     model.dispose(); model.dispose();
     expect(camera.children).toEqual([sibling]);
+    expect(scene.children).not.toContain(model.root);
+    expect(camera.parent).toBeNull();
     expect(disposals.every((entry) => entry.geometryDispose.mock.calls.length === 1 && entry.materialDispose.mock.calls.length === 1)).toBe(true);
     expect(textureDispose).toHaveBeenCalledTimes(1);
-    expect(scene.children).toContain(camera);
+    expect(camera.parent).toBeNull();
   });
 });

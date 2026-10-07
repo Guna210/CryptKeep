@@ -1,6 +1,6 @@
 import {
-  BoxGeometry, BufferGeometry, DataTexture, Group, Mesh, MeshStandardMaterial,
-  NearestFilter, RGBAFormat, Shape, ShapeGeometry, SRGBColorSpace,
+  BoxGeometry, BufferGeometry, DataTexture, Euler, Group, Mesh, MeshStandardMaterial,
+  NearestFilter, Quaternion, RGBAFormat, Shape, ShapeGeometry, SRGBColorSpace, Vector3,
 } from "three";
 import type { WorldRenderer } from "../renderer";
 import type { SwordState } from "../../weapons/sword";
@@ -23,18 +23,18 @@ export interface SwordPose {
 
 /** Pure camera-space pose calculation. State is read only and the active phase owns the hit window. */
 export function getSwordPose(state: SwordState): SwordPose {
-  const idle: SwordPose = { position: [0.39, -0.34, -0.82], rotation: [-0.12, -0.42, -0.58], scale: 1, charge: 0, active: false };
+  const idle: SwordPose = { position: [0.39, -0.18, -1], rotation: [-0.12, -0.42, -0.58], scale: 1, charge: 0, active: false };
   if (state.phase === "anticipation") {
     const charge = Math.max(0, Math.min(1, (state.elapsedSeconds - 0.25) / 0.95));
     const windup = Math.min(1, state.elapsedSeconds / 0.25);
-    return { position: [0.39 + charge * 0.025, -0.34 - windup * 0.025, -0.82],
+    return { position: [0.39 + charge * 0.025, -0.18 - windup * 0.025, -1],
       rotation: [-0.12 - charge * 0.12, -0.42 + windup * 0.1, -0.58 - windup * 0.18], scale: 1 + charge * 0.05,
       charge, active: false };
   }
   if (state.phase === "windup") {
     const heavy = state.committedKind === "sword-heavy";
     const t = Math.min(1, state.elapsedSeconds / (state.committedTiming?.windupSeconds ?? 0.1));
-    return { position: [0.39 + t * (heavy ? 0.045 : 0.025), -0.34 + t * 0.045, -0.82],
+    return { position: [0.39 + t * (heavy ? 0.045 : 0.025), -0.18 + t * 0.045, -1],
       rotation: [-0.12, -0.42, -0.58 - t * (heavy ? 0.5 : 0.36)], scale: heavy ? 1.06 : 1, charge: heavy ? 0.18 : 0, active: false };
   }
   if (state.phase === "active") {
@@ -42,7 +42,7 @@ export function getSwordPose(state: SwordState): SwordPose {
     // Full broadside sweep begins at the exact simulation active-window boundary.
     const t = Math.min(1, state.elapsedSeconds / (state.committedTiming?.activeSeconds ?? 0.12));
     const sweep = Math.sin(t * Math.PI);
-    return { position: [0.39 - sweep * (heavy ? 0.24 : 0.19), -0.34 + sweep * 0.07, -0.72],
+    return { position: [0.39 - sweep * (heavy ? 0.24 : 0.19), -0.18 + sweep * 0.07, -0.9],
       rotation: [-0.12 - sweep * 0.18, -0.42 + sweep * (heavy ? 0.42 : 0.35), -0.58 + sweep * (heavy ? 1.02 : 0.82)],
       scale: heavy ? 1.08 : 1, charge: heavy ? 0.22 : 0, active: true };
   }
@@ -91,7 +91,9 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
   let disposed = false;
   const attach = () => {
     if (detached || disposed) return;
-    world.camera.add(root);
+    // Cameras are commonly rendered separately and are not children of the scene.
+    // Put our own root in the traversed scene and express its transform in camera space.
+    world.scene.add(root);
     detached = true;
   };
   attach();
@@ -101,8 +103,12 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
     update(state) {
       if (disposed) return;
       const pose = getSwordPose(state);
-      root.position.set(...pose.position);
-      root.rotation.set(...pose.rotation);
+      world.camera.updateWorldMatrix(true, false);
+      const localPosition = new Vector3(...pose.position);
+      root.position.copy(world.camera.localToWorld(localPosition));
+      const cameraRotation = world.camera.getWorldQuaternion(new Quaternion());
+      const localRotation = new Quaternion().setFromEuler(new Euler(...pose.rotation));
+      root.quaternion.copy(cameraRotation).multiply(localRotation);
       root.scale.setScalar(pose.scale);
       charge.visible = pose.charge > 0;
       const glow = pose.charge * 0.8;
@@ -111,13 +117,13 @@ export function attachSwordViewmodel(world: Pick<WorldRenderer, "scene" | "camer
     },
     detach() {
       if (!detached) return;
-      world.camera.remove(root);
+      world.scene.remove(root);
       detached = false;
     },
     dispose() {
       if (disposed) return;
       disposed = true;
-      if (detached) world.camera.remove(root);
+      if (detached) world.scene.remove(root);
       detached = false;
       // These are the only resources created here; the supplied renderer and camera remain caller-owned.
       root.clear();
