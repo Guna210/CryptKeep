@@ -1,3 +1,5 @@
+> This branch is the owner-requested **cartoon art preview**. It replaces coarse pixel scaling with smooth rendering, teal beveled masonry, calmer slabs, amber sconces and a faceted sword. Open the Cloudflare branch preview and choose **Explore dungeon**; no debug command is needed. This experiment has passed independent Luna review and hosted25-browser verification; it has not been merged or adopted as the final art direction. See [task and decision](decisions/cartoon-art-preview.md).
+
 # CryptKeep
 
 CryptKeep is a browser-based first-person dungeon crawler under development, built with TypeScript, Three.js, and Vite. The current slice generates a seeded dungeon and supports first-person movement, sprint, dash, pause/resume, sword attacks, shared stamina, and combat feedback. Procedural enemies and campaign progression remain planned.

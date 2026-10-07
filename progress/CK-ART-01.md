@@ -46,3 +46,9 @@ e36e67a727b074002c376a7b4d5871c2a97e48dfed15885263804ac866bba579  tests/harness/
 ```
 
 The coordinator-owned `CONTEXT.md`, `SPEC.md` and `decisions/cartoon-art-preview.md` are excluded. Main owns Git publication, hosted artifact inspection, independent Luna review and acceptance records.
+
+## Coordinator acceptance
+
+Accepted after one independent Luna review/repair round. Both confirmed findings resolved; [round-one verification](../reviews/CK-ART-01/round-1-verification.md) PASS on repaired source `66e5f46a748f4cd467d4be5c0154e72c617976a5` (tree `daca987abeb61dca3f933379368aff9105a0a50b`). [Hosted run37625873118](https://github.com/Guna210/CryptKeep/actions/runs/37625873118), job112807347541 passed typecheck,171 app tests, tooling stage, build and25 Chromium tests. The [repair report](CK-ART-01.round-1-fix.md) preserves final23source hashes; the initial manifest above remains historical.
+
+Main and reviewer opened repaired production PNG SHA256 `dc2a2bc3a570061f3956bd077914dca4f1d981bcca46a761f868831d26ea0e7b`; artifact11483923109 archive digest `f11e36f59e0e798bfa432acdfa65b1983b558c826f55c275de4eb1110c84a2ae`. Default screenshot omits torches; source inspection confirms up to2 sconces. Initial run37623705432 failed6/25 browser checks and remains recorded. No GPU/comfort or finished-campaign claim. Published only on cartoon-art-preview; master unchanged, merge awaits owner instruction. Cloudflare deployment not independently verified.
