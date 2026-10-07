@@ -19,7 +19,12 @@ test("production entry shows painted dungeon masonry and the complete torch at d
   await page.setViewportSize({width:1280,height:800});
   await page.goto("/");
   await expect(page.getByText("Floor 1 · Seed cryptkeep-preview")).toBeVisible();
-  await page.getByRole("button",{name:"Explore dungeon"}).click();
+  const explore=page.getByRole("button",{name:"Explore dungeon"});
+  const exploreBox=await explore.boundingBox();
+  expect(exploreBox).not.toBeNull();
+  const clickX=exploreBox!.x+exploreBox!.width/2,clickY=exploreBox!.y+exploreBox!.height/2;
+  await page.mouse.move(clickX,clickY);
+  await page.mouse.click(clickX,clickY);
   await expect.poll(()=>page.evaluate(()=>document.pointerLockElement?.tagName)).toBe("CANVAS");
   const canvas=page.locator("canvas");
   const initial=await canvas.evaluate((element:HTMLCanvasElement)=>({
@@ -34,9 +39,8 @@ test("production entry shows painted dungeon masonry and the complete torch at d
   expect(initial.imageRendering).not.toBe("pixelated");
   mkdirSync("test-results/CK-ART-02",{recursive:true});
   await page.screenshot({path:"test-results/CK-ART-02/production-entry-yaw-0.png"});
-  const center=await canvas.evaluate((element:HTMLCanvasElement)=>{const rect=element.getBoundingClientRect();return{x:rect.x+rect.width/2,y:rect.y+rect.height/2};});
-  await page.mouse.move(center.x,center.y);
-  await page.mouse.move(center.x+115,center.y,{steps:8});
+  // Pointer lock retains the explore-click location; move left from there by 100px (~0.20 rad).
+  await page.mouse.move(clickX-100,clickY,{steps:5});
   await page.screenshot({path:"test-results/CK-ART-02/production-entry-angle-native-mouse.png"});
   await page.setViewportSize({width:900,height:600});
   await expect.poll(()=>canvas.evaluate((element:HTMLCanvasElement)=>element.width/element.height)).toBeCloseTo(1.5,2);

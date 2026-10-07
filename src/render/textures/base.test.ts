@@ -25,6 +25,13 @@ describe("base tile recipes", () => {
     expect(createBaseTile("other", "stone").data).not.toEqual(stone.data);
   });
 
+  it("paints broad stone value variation without a second grid",()=>{
+    const stone=createBaseTile("painted-value-range","stone",128).data;
+    let minimum=255,maximum=0;
+    for(let i=0;i<stone.length;i+=4){minimum=Math.min(minimum,stone[i]!);maximum=Math.max(maximum,stone[i]!);}
+    expect(maximum-minimum).toBeGreaterThan(35);
+  });
+
   it("rejects malformed seed, kind and dimensions", () => {
     expect(() => createBaseTile(3 as unknown as string, "stone")).toThrow(TypeError);
     expect(() => createBaseTile("seed", "invalid" as never)).toThrow(RangeError);

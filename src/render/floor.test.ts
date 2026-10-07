@@ -44,10 +44,11 @@ describe("rendered floor ownership and placement", () => {
     expect(floor.root.children.length).toBeLessThanOrEqual(16); // five fixed torch batches, two bounded sconces and lights
     const wallMeshes = floor.root.children.filter((item: any) => item.material === library.materials.stone) as any[];
     expect(wallMeshes).toHaveLength(1); // ceiling retains the shared stone library material
-    const masonry=floor.root.children.filter((item:any)=>item.geometry?.type==="ExtrudeGeometry") as any[];
+    const masonry=floor.root.children.filter((item:any)=>item.name==="rounded-stone-course") as any[];
     expect(masonry).toHaveLength(1); // both wall orientations share one geometry/material batch
     expect(masonry.every(mesh=>mesh.count>0&&mesh.instanceColor!==null)).toBe(true);
     expect(masonry[0].material.map).toBe(library.textures.stone);
+    expect(masonry[0].geometry.parameters.shapes.curves.filter((curve:any)=>curve.type==="EllipseCurve")).toHaveLength(4);
     expect(masonry[0].geometry.attributes.position.count).toBeGreaterThan(200);
     const faceUv=masonry[0].geometry.attributes.uv;
     expect(Math.min(...faceUv.array)).toBeGreaterThanOrEqual(-1e-6);
@@ -110,6 +111,16 @@ describe("rendered floor ownership and placement", () => {
     expect(floor.root.children.filter((item:any)=>item.name?.startsWith("torch-")).map((item:any)=>item.name)).toEqual([
       "torch-iron-mount","torch-wood-shaft","torch-head-wrap","torch-orange-flame","torch-yellow-core",
     ]);
+    const outer=floor.root.children.find((item:any)=>item.name==="torch-orange-flame") as any;
+    const core=floor.root.children.find((item:any)=>item.name==="torch-yellow-core") as any;
+    expect(outer.geometry.type).toBe("ExtrudeGeometry");
+    expect(core.geometry.type).toBe("ExtrudeGeometry");
+    expect(outer.geometry.parameters.shapes.holes).toHaveLength(1);
+    expect(outer.material).not.toBe(core.material);
+    outer.getMatrixAt(0,point);const outerCenter=point.elements.slice(12,15);
+    core.getMatrixAt(0,point);const coreCenter=point.elements.slice(12,15);
+    expect(Math.hypot(coreCenter[0]!-outerCenter[0]!,coreCenter[2]!-outerCenter[2]!)).toBeCloseTo(0.04,4);
+    expect(core.geometry.attributes.position.count).toBeGreaterThan(400);
     const moss=floor.root.children.find((item:any)=>item.geometry?.type==="PlaneGeometry") as any;
     expect(moss.count).toBeGreaterThan(0);
     expect(moss.count).toBeLessThanOrEqual(16);
@@ -162,5 +173,19 @@ describe("rendered floor ownership and placement", () => {
     expect(borrowedTextureDispose).not.toHaveBeenCalled();
     expect(library.materials.floor).toBeTruthy();
     library.dispose();
+  });
+
+  it("puts the primary preview torch on the forward-left wall in both default and slight-turn views",()=>{
+    const plan=generateFloor({campaignSeed:"cryptkeep-preview",floorNumber:1}).plan;
+    const library=createMaterialLibrary("cryptkeep-preview",16);
+    const floor=createRenderedFloor(plan,library,{ceilingVisible:false});
+    const outer=floor.root.children.find((item:any)=>item.name==="torch-orange-flame") as any;
+    const point=new Matrix4();outer.getMatrixAt(0,point);
+    const dx=plan.roles.entry.x*2+1-point.elements[12],dz=plan.roles.entry.z*2+1-point.elements[14];
+    expect(dx).toBeGreaterThan(0);expect(dz).toBeGreaterThan(0);
+    const bearingLeft=Math.atan2(dx,dz);
+    expect(bearingLeft).toBeLessThan(0.5); // yaw-zero horizontal frustum
+    expect(Math.abs(bearingLeft-0.2)).toBeLessThan(0.25); // native ~100px left turn keeps it framed
+    floor.dispose();library.dispose();
   });
 });

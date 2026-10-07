@@ -1,7 +1,7 @@
 import {
   BoxGeometry, ConeGeometry, CylinderGeometry, ExtrudeGeometry, Group, InstancedMesh, Matrix4, PlaneGeometry,
   Color, MeshStandardMaterial, OctahedronGeometry, PointLight, Shape, Vector3, BufferGeometry,
-  LatheGeometry, TubeGeometry, CatmullRomCurve3, Vector2,
+  TubeGeometry, CatmullRomCurve3, Path,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { RoleFloorPlan, SpawnPadKind } from "../dungeon/roles";
@@ -22,7 +22,12 @@ export interface RenderedFloor {
 const MARKERS: readonly SpawnPadKind[] = ["entry", "boss", "reward", "exit"];
 const matrix = new Matrix4();
 const blockShape = new Shape();
-blockShape.moveTo(-0.39,-0.39); blockShape.lineTo(0.39,-0.39); blockShape.lineTo(0.39,0.39); blockShape.lineTo(-0.39,0.39); blockShape.closePath();
+const cornerRadius=0.13,faceHalf=0.45,cornerCenter=faceHalf-cornerRadius;
+blockShape.moveTo(-cornerCenter,-faceHalf); blockShape.lineTo(cornerCenter,-faceHalf);
+blockShape.absarc(cornerCenter,-cornerCenter,cornerRadius,-Math.PI/2,0,false); blockShape.lineTo(faceHalf,cornerCenter);
+blockShape.absarc(cornerCenter,cornerCenter,cornerRadius,0,Math.PI/2,false); blockShape.lineTo(-cornerCenter,faceHalf);
+blockShape.absarc(-cornerCenter,cornerCenter,cornerRadius,Math.PI/2,Math.PI,false); blockShape.lineTo(-faceHalf,-cornerCenter);
+blockShape.absarc(-cornerCenter,-cornerCenter,cornerRadius,Math.PI,Math.PI*1.5,false); blockShape.closePath();
 const STONE_TONES = [0xe1e2d7, 0xf0eadc, 0xd5e1df, 0xe2eee0, 0xd0d8d8, 0xe8dfcc] as const;
 
 /** Build instanced floor, ceiling, boundary walls and role markers. Materials are borrowed. */
@@ -84,9 +89,9 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
       });
       mortar.instanceMatrix.needsUpdate=true; mortar.computeBoundingSphere(); root.add(mortar); meshes.push(mortar);
     }
-    // The 0.78m face plus a four-segment 0.095m bevel gives a fixed 0.97m footprint.
+    // The 0.90m rounded face plus a narrow four-segment 0.035m bevel gives a fixed 0.97m footprint.
     // Two stones occupy each 2m module: 0.03m mortar remains within and across tile boundaries.
-    const masonry = new ExtrudeGeometry(blockShape, { depth: 0.10, bevelEnabled: true, bevelSegments: 4, steps: 1, bevelSize: 0.095, bevelThickness: 0.045, curveSegments: 5 });
+    const masonry = new ExtrudeGeometry(blockShape, { depth: 0.10, bevelEnabled: true, bevelSegments: 4, steps: 1, bevelSize: 0.035, bevelThickness: 0.045, curveSegments: 5 });
     masonry.translate(0, 0, -0.05);
     masonry.computeBoundingBox();
     const stoneBounds=masonry.boundingBox!;
@@ -116,13 +121,13 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
         matrix.setPosition(p.x,p.y,p.z);mesh.setMatrixAt(i,matrix);
         mesh.setColorAt(i,new Color(STONE_TONES[(i*7+Math.floor(p.x+p.z))%STONE_TONES.length]));
       });
-      mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
+      mesh.name="rounded-stone-course";mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);
     }
     // The entry-facing wall torch sits in the yaw-zero forward view; one further fixture lights the route.
     const allSconceEdges = [...wallX.map(p=>({...p,face:"x" as const})), ...wallZ.map(p=>({...p,face:"z" as const}))];
     const entryX=plan.roles.entry.x*2+1, entryZ=plan.roles.entry.z*2+1;
     const forward=[...allSconceEdges].filter(edge=>edge.face==="z"&&edge.normalZ===1&&edge.z<entryZ)
-      .sort((a,b)=>Math.abs(a.x-entryX)-Math.abs(b.x-entryX)||Math.abs(a.z-entryZ)-Math.abs(b.z-entryZ));
+      .sort((a,b)=>Math.abs(a.x-(entryX-2))-Math.abs(b.x-(entryX-2))||Math.abs(a.z-entryZ)-Math.abs(b.z-entryZ));
     const nearest=forward.length?[forward[0]!]:[...allSconceEdges].sort((a,b)=>Math.hypot(a.x-entryX,a.z-entryZ)-Math.hypot(b.x-entryX,b.z-entryZ)).slice(0,1);
     const spread=[allSconceEdges[Math.floor(allSconceEdges.length/2)]].filter((edge):edge is typeof allSconceEdges[number]=>Boolean(edge));
     const sconceEdges=[...nearest,...spread].filter((edge,index,array)=>array.findIndex(item=>item.x===edge.x&&item.z===edge.z&&item.face===edge.face)===index).slice(0,2);
@@ -133,11 +138,20 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
       const woodMaterial = new MeshStandardMaterial({ color:0x76513a, roughness:0.96, metalness:0 });
       const wrapMaterial = new MeshStandardMaterial({ color:0xc39a5e, roughness:0.9, metalness:0.08 });
       ownedMaterials.push(flameMaterial,coreMaterial,ironMaterial,woodMaterial,wrapMaterial);
-      const flameGeometry = new LatheGeometry([
-        new Vector2(0,0),new Vector2(.045,.045),new Vector2(.085,.13),new Vector2(.078,.22),
-        new Vector2(.052,.30),new Vector2(.035,.37),new Vector2(.015,.43),new Vector2(0,.47),
-      ],20);
-      const coreGeometry = new LatheGeometry([new Vector2(0,.04),new Vector2(.025,.08),new Vector2(.046,.15),new Vector2(.037,.22),new Vector2(.021,.29),new Vector2(.009,.34),new Vector2(0,.37)],16);
+      const flameShape=new Shape();
+      flameShape.moveTo(0,.012);flameShape.quadraticCurveTo(-.13,.16,-.12,.30);flameShape.quadraticCurveTo(-.12,.43,-.055,.53);flameShape.quadraticCurveTo(-.022,.58,0,.60);
+      flameShape.quadraticCurveTo(.022,.58,.055,.53);flameShape.quadraticCurveTo(.12,.43,.12,.30);flameShape.quadraticCurveTo(.13,.16,0,.012);flameShape.closePath();
+      const flameOpening=new Path();
+      flameOpening.moveTo(0,.075);flameOpening.quadraticCurveTo(.085,.19,.08,.29);flameOpening.quadraticCurveTo(.077,.39,.038,.47);flameOpening.quadraticCurveTo(.018,.51,0,.535);
+      flameOpening.quadraticCurveTo(-.018,.51,-.038,.47);flameOpening.quadraticCurveTo(-.077,.39,-.08,.29);flameOpening.quadraticCurveTo(-.085,.19,0,.075);flameOpening.closePath();
+      flameShape.holes.push(flameOpening);
+      const coreShape=new Shape();
+      coreShape.moveTo(0,.075);coreShape.quadraticCurveTo(-.066,.18,-.062,.28);coreShape.quadraticCurveTo(-.06,.37,-.029,.44);coreShape.quadraticCurveTo(-.014,.48,0,.505);
+      coreShape.quadraticCurveTo(.014,.48,.029,.44);coreShape.quadraticCurveTo(.06,.37,.062,.28);coreShape.quadraticCurveTo(.066,.18,0,.075);coreShape.closePath();
+      const flameGeometry = new ExtrudeGeometry(flameShape,{depth:.055,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.01,bevelThickness:.008,curveSegments:8});
+      flameGeometry.translate(0,0,-.0275);flameGeometry.computeVertexNormals();
+      const coreGeometry = new ExtrudeGeometry(coreShape,{depth:.04,bevelEnabled:false,steps:1,curveSegments:8});
+      coreGeometry.translate(0,0,-.02);coreGeometry.computeVertexNormals();
       const plateGeometry=new BoxGeometry(.22,.34,.055);
       const shaftGeometry=new CylinderGeometry(.046,.058,.38,14,1);
       const wrapPoints=Array.from({length:49},(_,i)=>{const t=i/48,angle=t*Math.PI*6;return new Vector3(Math.cos(angle)*.071,-.08+t*.16,Math.sin(angle)*.071);});
@@ -159,7 +173,7 @@ export function createRenderedFloor(plan: RoleFloorPlan, library: MaterialLibrar
         const yaw=edge.face==="x"?(edge.normalX===1?Math.PI/2:-Math.PI/2):(edge.normalZ===1?0:Math.PI);
         const set=(mesh:InstancedMesh,py:number,forward:number)=>{matrix.makeRotationY(yaw);matrix.setPosition(x+normalX*forward,py,z+normalZ*forward);mesh.setMatrixAt(i,matrix);};
         set(iron,0,0);set(shaft,2.12,.07);set(wrap,2.34,.07);
-        set(flameMesh,2.39,.07);set(coreMesh,2.43,.075);
+        set(flameMesh,2.34,.07);set(coreMesh,2.34,.11);
         const light=new PointLight(0xffb25c,12,7,1.8); light.position.set(x+normalX*.13,2.53,z+normalZ*.13); root.add(light); lights.push(light);
       });
       for(const [mesh,name] of [[iron,"torch-iron-mount"],[shaft,"torch-wood-shaft"],[wrap,"torch-head-wrap"],[flameMesh,"torch-orange-flame"],[coreMesh,"torch-yellow-core"]] as const){mesh.name=name;mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();root.add(mesh);meshes.push(mesh);}

@@ -55,9 +55,9 @@ export function createBaseTile(seed: string, kind: BaseTileKind, size = 128): Ba
       const broadA = Math.sin((x/size*1.17 + y/size*.23 + patchX/size)*Math.PI*2);
       const broadB = Math.cos((y/size*1.45 - x/size*.16 + patchY/size)*Math.PI*2);
       const patch = Math.max(0,1-Math.hypot((x-patchX)/(size*.7),(y-patchY)/(size*.55)));
-      const directional = kind === "stone" ? (0.5-x/size)*12 + (0.55-y/size)*15 : (0.5-x/size)*5;
+      const directional = kind === "stone" ? (0.5-x/size)*24 + (0.55-y/size)*30 : (0.5-x/size)*5;
       const edgeWear = kind === "stone" ? (edge < .045 ? 10 : edge < .08 ? 4 : 0) : (edge < .025 ? 5 : 0);
-      const amount = broadA*3.2 + broadB*2.2 + patch*8 + directional + edgeWear;
+      const amount = broadA*6 + broadB*4.5 + patch*18 + directional + edgeWear;
       const micro = Math.sin(x*12.9898 + y*78.233) * (kind === "stone" ? .65 : .35);
       put(x,y,[base[0]+amount+micro,base[1]+amount+micro,base[2]+amount+micro]);
     }
@@ -68,8 +68,8 @@ export function createBaseTile(seed: string, kind: BaseTileKind, size = 128): Ba
       line(size*.72,size*.895,size*.87,size*.895,[45,69,80],Math.max(1,size*.009));
       const cx=crackX,cy=crackY;
       const crack:[[number,number],[number,number],[number,number],[number,number]] = [[cx,cy],[cx-size*.025,cy+size*.035],[cx+size*.015,cy+size*.068],[cx-size*.005,cy+size*.10]];
-      for(let i=0;i<3;i++) line(crack[i]![0],crack[i]![1],crack[i+1]![0],crack[i+1]![1],[37,61,71],Math.max(1,size*.012));
-      line(cx-size*.012,cy+size*.038,cx-size*.045,cy+size*.061,[45,69,77],Math.max(1,size*.009));
+      for(let i=0;i<3;i++) line(crack[i]![0],crack[i]![1],crack[i+1]![0],crack[i+1]![1],[52,76,86],Math.max(1,size*.008));
+      line(cx-size*.012,cy+size*.038,cx-size*.045,cy+size*.061,[60,82,90],Math.max(1,size*.006));
       // A few broad chipped flecks, kept sparse and clustered near an edge.
       for(let i=0;i<3;i++) {
         const x=rng.nextInt(0,size), y=rng.nextInt(0,size);

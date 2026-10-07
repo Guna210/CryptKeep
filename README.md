@@ -1,4 +1,4 @@
-> This branch is the owner-requested **cartoon art preview**. It replaces coarse pixel scaling with smooth rendering, teal beveled masonry, calmer slabs, amber sconces and a faceted sword. Open the Cloudflare branch preview and choose **Explore dungeon**; no debug command is needed. This experiment has passed independent Luna review and hosted25-browser verification; it has not been merged or adopted as the final art direction. See [task and decision](decisions/cartoon-art-preview.md).
+> This branch is the owner-requested **cartoon art preview**, currently being refined with rounded painted masonry and recognizable warm torches. Open the Cloudflare branch preview and choose **Explore dungeon**; no debug command is needed. CK-ART-02 review is in progress; this branch has not been merged or adopted as the final art direction. See [refinement task](decisions/cartoon-art-refinement.md).
 
 # CryptKeep
 
